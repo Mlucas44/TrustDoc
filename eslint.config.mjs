@@ -103,6 +103,13 @@ export default [
     },
   },
   {
+    // Scripts exception: allow console.log in scripts directory
+    files: ["scripts/**/*.{js,ts}"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
     ignores: [
       ".next/*",
       "node_modules/*",
