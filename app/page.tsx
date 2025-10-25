@@ -1,15 +1,10 @@
-import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { FileCheck, Shield, Zap } from "lucide-react";
 import Link from "next/link";
+
+import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Home() {
   return (
@@ -43,8 +38,8 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Vos documents sont analysés avec les dernières technologies de
-              cryptographie et de vérification d&apos;intégrité.
+              Vos documents sont analysés avec les dernières technologies de cryptographie et de
+              vérification d&apos;intégrité.
             </CardDescription>
           </CardContent>
         </Card>
@@ -58,8 +53,8 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Obtenez des résultats en quelques secondes. Notre infrastructure
-              est optimisée pour la performance.
+              Obtenez des résultats en quelques secondes. Notre infrastructure est optimisée pour la
+              performance.
             </CardDescription>
           </CardContent>
         </Card>
@@ -73,8 +68,8 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Algorithmes éprouvés et conformité aux standards internationaux
-              pour une vérification de confiance.
+              Algorithmes éprouvés et conformité aux standards internationaux pour une vérification
+              de confiance.
             </CardDescription>
           </CardContent>
         </Card>
@@ -91,8 +86,7 @@ export default function Home() {
             l&apos;authenticité
           </li>
           <li>
-            <strong>Recevez</strong> un rapport détaillé avec le niveau de
-            confiance
+            <strong>Recevez</strong> un rapport détaillé avec le niveau de confiance
           </li>
         </ol>
       </section>

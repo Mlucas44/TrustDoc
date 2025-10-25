@@ -1,0 +1,22 @@
+# Build outputs
+.next
+dist
+build
+out
+
+# Dependencies
+node_modules
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Test outputs
+coverage
+playwright-report
+test-results
+
+# Misc
+*.log
+.DS_Store
+.env*
+!.env.example

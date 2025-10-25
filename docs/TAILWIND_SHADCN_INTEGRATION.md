@@ -13,18 +13,21 @@ Ce document décrit l'intégration complète de Tailwind CSS v3 et shadcn/ui dan
 ## Objectifs atteints
 
 ### ✅ Design System minimal et cohérent
+
 - Tailwind CSS v3.4 configuré avec PostCSS
 - Composants shadcn/ui accessibles et composables
 - Dark mode prêt à l'emploi
 - Typographie lisible avec styles markdown
 
 ### ✅ Productivité accélérée
+
 - 9 composants de base prêts à l'emploi
 - Utilitaire `cn()` pour combiner les classes
 - Conventions claires et documentées
 - Styleguide interactive à `/styleguide`
 
 ### ✅ Accessibilité
+
 - Focus visible sur tous les composants
 - Support clavier complet
 - Aria labels et screen reader support
@@ -128,12 +131,14 @@ app/
 Système basé sur CSS variables HSL:
 
 **Mode clair:**
+
 - Background: `hsl(0 0% 100%)`
 - Foreground: `hsl(222.2 84% 4.9%)`
 - Primary: `hsl(221.2 83.2% 53.3%)` (Bleu)
 - Secondary: `hsl(210 40% 96.1%)` (Gris clair)
 
 **Mode sombre:**
+
 - Background: `hsl(222.2 84% 4.9%)`
 - Foreground: `hsl(210 40% 98%)`
 - Primary: `hsl(217.2 91.2% 59.8%)` (Bleu clair)
@@ -213,9 +218,7 @@ Bouton pour basculer clair/sombre avec icônes Sun/Moon
   <div className="min-h-screen flex flex-col">
     <Navbar />
     <main className="flex-1">
-      <div className="container mx-auto px-4 py-8">
-        {children}
-      </div>
+      <div className="container mx-auto px-4 py-8">{children}</div>
     </main>
   </div>
   <Toaster />
@@ -227,6 +230,7 @@ Bouton pour basculer clair/sombre avec icônes Sun/Moon
 ## Accessibilité implémentée
 
 ### Focus visible
+
 ```css
 focus-visible:outline-none
 focus-visible:ring-2
@@ -235,12 +239,14 @@ focus-visible:ring-offset-2
 ```
 
 ### Screen reader support
+
 ```tsx
 <span className="sr-only">Screen reader text</span>
 aria-label="Descriptive label"
 ```
 
 ### Keyboard navigation
+
 - Tous les composants supportent Tab/Shift+Tab
 - Enter/Space pour activer
 - Escape pour fermer les modales
@@ -252,6 +258,7 @@ aria-label="Descriptive label"
 **URL**: http://localhost:3000/styleguide
 
 **Contenu**:
+
 - Toutes les variantes de boutons
 - Exemples de cartes
 - Formulaires complets
@@ -283,7 +290,7 @@ const { theme, setTheme } = useTheme();
 
 <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
   {theme === "dark" ? <Sun /> : <Moon />}
-</button>
+</button>;
 ```
 
 ### CSS Variables
@@ -299,9 +306,13 @@ Styles pour le contenu markdown:
 ```tsx
 <div className="prose dark:prose-invert">
   <h1>Heading 1</h1>
-  <p>Paragraph with <strong>bold</strong> and <a>links</a></p>
+  <p>
+    Paragraph with <strong>bold</strong> and <a>links</a>
+  </p>
   <code>inline code</code>
-  <pre><code>code block</code></pre>
+  <pre>
+    <code>code block</code>
+  </pre>
   <blockquote>Quote</blockquote>
 </div>
 ```
@@ -325,6 +336,7 @@ import { cn } from "@/lib/utils";
 ```
 
 Utilise:
+
 - `clsx` - Conditional classes
 - `tailwind-merge` - Résout les conflits Tailwind
 
@@ -333,26 +345,31 @@ Utilise:
 ## Tests et Validation
 
 ### ✅ TypeScript strict
+
 ```bash
 pnpm typecheck  # Passed
 ```
 
 ### ✅ ESLint
+
 ```bash
 pnpm lint  # Passed
 ```
 
 ### ✅ Build production
+
 ```bash
 pnpm build  # Successful
 ```
 
 ### ✅ Playwright tests
+
 ```bash
 pnpm test  # 2/2 passed
 ```
 
 ### ✅ Accessibilité
+
 - Focus visible sur tous les composants
 - Screen reader support
 - Keyboard navigation complète
@@ -383,6 +400,7 @@ pnpm test  # 2/2 passed
 ### Composants additionnels
 
 Selon les besoins, ajouter:
+
 - Select (dropdown)
 - Checkbox / Radio
 - Switch (toggle)
@@ -421,6 +439,7 @@ Selon les besoins, ajouter:
 L'intégration de Tailwind CSS et shadcn/ui dans TrustDoc est **complète et opérationnelle**.
 
 **Bénéfices**:
+
 - ⚡ Développement rapide avec composants prêts
 - 🎨 Design cohérent et moderne
 - ♿ Accessibilité intégrée

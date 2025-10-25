@@ -16,6 +16,7 @@ Ce guide explique comment utiliser les composants shadcn/ui et Tailwind CSS dans
 ## Introduction
 
 TrustDoc utilise:
+
 - **Tailwind CSS v3** - Framework CSS utilitaire
 - **shadcn/ui** - Collection de composants React accessibles et personnalisables
 - **next-themes** - Gestion du dark mode
@@ -46,6 +47,7 @@ Les couleurs utilisent des CSS variables HSL définies dans `app/globals.css`:
 ```
 
 **Utilisation:**
+
 ```tsx
 <div className="bg-background text-foreground">
   <h1 className="text-primary">Titre</h1>
@@ -55,10 +57,12 @@ Les couleurs utilisent des CSS variables HSL définies dans `app/globals.css`:
 ### Typographie
 
 Styles de base:
+
 - Police: Inter (Google Fonts)
 - Échelle: text-sm, text-base, text-lg, text-xl, text-2xl, text-3xl
 
 **Prose (Markdown):**
+
 ```tsx
 <div className="prose dark:prose-invert">
   <h1>Titre</h1>
@@ -69,10 +73,9 @@ Styles de base:
 ### Spacing
 
 Container standardisé:
+
 ```tsx
-<div className="container mx-auto px-4 py-8">
-  {/* Contenu */}
-</div>
+<div className="container mx-auto px-4 py-8">{/* Contenu */}</div>
 ```
 
 ---
@@ -84,6 +87,7 @@ Container standardisé:
 **Localisation**: `components/ui/button.tsx`
 
 **Variantes**:
+
 - `default` - Bouton principal (bleu)
 - `secondary` - Bouton secondaire (gris)
 - `destructive` - Action destructive (rouge)
@@ -94,6 +98,7 @@ Container standardisé:
 **Tailles**: `sm`, `default`, `lg`, `icon`
 
 **Exemples:**
+
 ```tsx
 import { Button } from "@/components/ui/button";
 
@@ -115,6 +120,7 @@ import { Button } from "@/components/ui/button";
 **Localisation**: `components/ui/card.tsx`
 
 **Sous-composants**:
+
 - `Card` - Container principal
 - `CardHeader` - En-tête
 - `CardTitle` - Titre
@@ -123,6 +129,7 @@ import { Button } from "@/components/ui/button";
 - `CardFooter` - Pied de page
 
 **Exemple:**
+
 ```tsx
 import {
   Card,
@@ -144,7 +151,7 @@ import {
   <CardFooter>
     <Button>Action</Button>
   </CardFooter>
-</Card>
+</Card>;
 ```
 
 ---
@@ -156,6 +163,7 @@ import {
 **Variantes**: `default`, `secondary`, `destructive`, `outline`
 
 **Exemple:**
+
 ```tsx
 import { Badge } from "@/components/ui/badge";
 
@@ -171,6 +179,7 @@ import { Badge } from "@/components/ui/badge";
 **Localisation**: `components/ui/input.tsx`, `components/ui/label.tsx`
 
 **Exemple:**
+
 ```tsx
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -178,7 +187,7 @@ import { Label } from "@/components/ui/label";
 <div className="space-y-2">
   <Label htmlFor="email">Email</Label>
   <Input id="email" type="email" placeholder="email@example.com" />
-</div>
+</div>;
 ```
 
 ---
@@ -188,10 +197,11 @@ import { Label } from "@/components/ui/label";
 **Localisation**: `components/ui/textarea.tsx`
 
 **Exemple:**
+
 ```tsx
 import { Textarea } from "@/components/ui/textarea";
 
-<Textarea placeholder="Votre message..." />
+<Textarea placeholder="Votre message..." />;
 ```
 
 ---
@@ -201,6 +211,7 @@ import { Textarea } from "@/components/ui/textarea";
 **Localisation**: `components/ui/dialog.tsx`
 
 **Sous-composants**:
+
 - `Dialog` - Container principal
 - `DialogTrigger` - Élément déclencheur
 - `DialogContent` - Contenu du dialog
@@ -210,6 +221,7 @@ import { Textarea } from "@/components/ui/textarea";
 - `DialogFooter` - Pied de page
 
 **Exemple:**
+
 ```tsx
 import {
   Dialog,
@@ -236,7 +248,7 @@ import {
       <Button>Confirmer</Button>
     </DialogFooter>
   </DialogContent>
-</Dialog>
+</Dialog>;
 ```
 
 ---
@@ -246,12 +258,14 @@ import {
 **Localisation**: `components/ui/tabs.tsx`
 
 **Sous-composants**:
+
 - `Tabs` - Container principal
 - `TabsList` - Liste des onglets
 - `TabsTrigger` - Bouton d'onglet
 - `TabsContent` - Contenu d'un onglet
 
 **Exemple:**
+
 ```tsx
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -260,13 +274,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
     <TabsTrigger value="account">Account</TabsTrigger>
     <TabsTrigger value="password">Password</TabsTrigger>
   </TabsList>
-  <TabsContent value="account">
-    Contenu account
-  </TabsContent>
-  <TabsContent value="password">
-    Contenu password
-  </TabsContent>
-</Tabs>
+  <TabsContent value="account">Contenu account</TabsContent>
+  <TabsContent value="password">Contenu password</TabsContent>
+</Tabs>;
 ```
 
 ---
@@ -278,6 +288,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 **Setup**: Le `<Toaster />` est déjà inclus dans le layout principal.
 
 **Exemple:**
+
 ```tsx
 "use client";
 
@@ -303,6 +314,7 @@ export function MyComponent() {
 ```
 
 **Toast destructive:**
+
 ```tsx
 toast({
   variant: "destructive",
@@ -320,12 +332,7 @@ toast({
 Le `ThemeProvider` est déjà configuré dans `app/layout.tsx`:
 
 ```tsx
-<ThemeProvider
-  attribute="class"
-  defaultTheme="system"
-  enableSystem
-  disableTransitionOnChange
->
+<ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
   {children}
 </ThemeProvider>
 ```
@@ -337,7 +344,7 @@ Le composant `ThemeToggle` est disponible dans la navbar:
 ```tsx
 import { ThemeToggle } from "@/components/theme-toggle";
 
-<ThemeToggle />
+<ThemeToggle />;
 ```
 
 ### CSS Variables
@@ -386,11 +393,13 @@ Combine et fusionne les classes Tailwind:
 ```tsx
 import { cn } from "@/lib/utils";
 
-<div className={cn(
-  "base-classes",
-  condition && "conditional-classes",
-  className // Props externe
-)} />
+<div
+  className={cn(
+    "base-classes",
+    condition && "conditional-classes",
+    className // Props externe
+  )}
+/>;
 ```
 
 ### Structure des composants
@@ -415,6 +424,7 @@ components/
 ### Accessibilité
 
 Tous les composants incluent:
+
 - `aria-label` ou `sr-only` pour screen readers
 - States focus visibles (`focus-visible:ring`)
 - Support clavier complet
@@ -423,11 +433,7 @@ Tous les composants incluent:
 ### Exemple de composant accessible
 
 ```tsx
-<Button
-  variant="ghost"
-  size="icon"
-  aria-label="Toggle theme"
->
+<Button variant="ghost" size="icon" aria-label="Toggle theme">
   <Sun className="h-5 w-5" />
   <span className="sr-only">Toggle theme</span>
 </Button>
@@ -444,6 +450,7 @@ http://localhost:3000/styleguide
 ```
 
 Cette page démontre:
+
 - Toutes les variantes de boutons
 - Exemples de cartes
 - Formulaires

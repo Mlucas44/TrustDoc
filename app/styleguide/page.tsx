@@ -1,6 +1,9 @@
 "use client";
 
+import { FileCheck, Shield, Zap } from "lucide-react";
+
 import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,10 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -23,19 +22,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { FileCheck, Shield, Zap } from "lucide-react";
 
 export default function StyleguidePage() {
   const { toast } = useToast();
 
   return (
     <div className="space-y-12">
-      <PageHeader
-        title="Style Guide"
-        description="Aperçu de tous les composants UI disponibles"
-      />
+      <PageHeader title="Style Guide" description="Aperçu de tous les composants UI disponibles" />
 
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold">Boutons</h2>
@@ -79,9 +77,7 @@ export default function StyleguidePage() {
               <CardDescription>Card description goes here</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                This is the card content area.
-              </p>
+              <p className="text-sm text-muted-foreground">This is the card content area.</p>
             </CardContent>
             <CardFooter>
               <Button className="w-full">Action</Button>
@@ -93,9 +89,7 @@ export default function StyleguidePage() {
               <CardTitle>Simple Card</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm">
-                A simple card without footer or icons.
-              </p>
+              <p className="text-sm">A simple card without footer or icons.</p>
             </CardContent>
           </Card>
 
@@ -107,9 +101,7 @@ export default function StyleguidePage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Card with an icon in the header.
-              </p>
+              <p className="text-sm text-muted-foreground">Card with an icon in the header.</p>
             </CardContent>
           </Card>
         </div>
@@ -152,8 +144,8 @@ export default function StyleguidePage() {
             <DialogHeader>
               <DialogTitle>Are you absolutely sure?</DialogTitle>
               <DialogDescription>
-                This action cannot be undone. This will permanently delete your
-                account and remove your data from our servers.
+                This action cannot be undone. This will permanently delete your account and remove
+                your data from our servers.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -175,9 +167,7 @@ export default function StyleguidePage() {
             <Card>
               <CardHeader>
                 <CardTitle>Account</CardTitle>
-                <CardDescription>
-                  Make changes to your account here.
-                </CardDescription>
+                <CardDescription>Make changes to your account here.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="space-y-1">
@@ -194,9 +184,7 @@ export default function StyleguidePage() {
             <Card>
               <CardHeader>
                 <CardTitle>Password</CardTitle>
-                <CardDescription>
-                  Change your password here.
-                </CardDescription>
+                <CardDescription>Change your password here.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="space-y-1">
@@ -251,13 +239,11 @@ export default function StyleguidePage() {
           <h2>Heading 2</h2>
           <h3>Heading 3</h3>
           <p>
-            This is a paragraph with <strong>bold text</strong> and{" "}
-            <a href="#">a link</a>. Lorem ipsum dolor sit amet, consectetur
-            adipiscing elit.
+            This is a paragraph with <strong>bold text</strong> and <a href="#">a link</a>. Lorem
+            ipsum dolor sit amet, consectetur adipiscing elit.
           </p>
           <blockquote>
-            This is a blockquote. It can be used to highlight important
-            information.
+            This is a blockquote. It can be used to highlight important information.
           </blockquote>
           <ul>
             <li>First item</li>

@@ -52,12 +52,19 @@ pnpm start
 ### Code Quality
 
 ```bash
-# Run ESLint
-pnpm lint
+# Lint with ESLint
+pnpm lint              # Check
+pnpm lint:fix          # Auto-fix
 
-# Run TypeScript type checking
+# Format with Prettier
+pnpm format            # Format all files
+pnpm format:check      # Check formatting
+
+# TypeScript type checking
 pnpm typecheck
 ```
+
+**Pre-commit hooks**: Husky + lint-staged automatically run lint and format on staged files before each commit.
 
 ### Testing
 
@@ -100,6 +107,7 @@ TrustDoc/
 Returns the application health status.
 
 **Response:**
+
 ```json
 {
   "status": "ok"
@@ -112,8 +120,8 @@ Returns the application health status.
 - **React Strict Mode** - Development warnings and best practices
 - **App Router** - File-system based routing with React Server Components
 - **Integration Tests** - Automated testing with Playwright
-- **Code Quality** - ESLint and TypeScript checking
-- **CI Ready** - GitHub Actions workflow included
+- **Code Quality** - ESLint + Prettier with pre-commit hooks (Husky)
+- **CI/CD** - GitHub Actions with matrix testing (Node 18/20)
 
 ## Claude Code Custom Commands
 
@@ -146,6 +154,7 @@ TrustDoc utilise **Tailwind CSS** et **shadcn/ui** pour le design system.
 ### Dark Mode
 
 Le dark mode est activé par défaut avec le toggle dans la navbar:
+
 - Thème clair/sombre/système
 - Basé sur `next-themes`
 - CSS variables pour les couleurs
@@ -153,6 +162,7 @@ Le dark mode est activé par défaut avec le toggle dans la navbar:
 ### Documentation complète
 
 Consultez [docs/UI_COMPONENTS.md](docs/UI_COMPONENTS.md) pour:
+
 - Guide d'utilisation de chaque composant
 - Exemples de code
 - Conventions et bonnes pratiques
@@ -161,6 +171,42 @@ Consultez [docs/UI_COMPONENTS.md](docs/UI_COMPONENTS.md) pour:
 ### Styleguide
 
 Visualisez tous les composants sur [http://localhost:3000/styleguide](http://localhost:3000/styleguide)
+
+## Code Quality & Conventions
+
+TrustDoc applique des standards stricts de qualité de code:
+
+### Tools
+
+- **ESLint 9** - Linting avec règles TypeScript/React avancées
+- **Prettier** - Formatage automatique (printWidth 100, doubles quotes)
+- **Husky** - Git hooks pre-commit
+- **lint-staged** - Lint uniquement les fichiers modifiés
+
+### Rules principales
+
+- Import automatique des types avec `type` keyword
+- Ordre des imports (builtin → external → internal → sibling)
+- Suppression automatique des imports inutilisés
+- Pas de `console.log` (warn, error autorisés)
+- Balises React auto-fermantes
+- TypeScript strict mode
+
+### Workflow
+
+1. Écrire le code
+2. `pnpm lint:fix` - Auto-correction
+3. `git commit` - Pre-commit hook vérifie automatiquement
+4. CI vérifie: lint + format + typecheck + tests + build
+
+### Documentation
+
+Consultez [docs/CODE_QUALITY.md](docs/CODE_QUALITY.md) pour:
+
+- Règles ESLint détaillées
+- Configuration Prettier
+- Troubleshooting
+- Bonnes pratiques
 
 ## Next Steps
 
