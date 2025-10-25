@@ -7,6 +7,8 @@ Document trust verification platform built with Next.js 16, TypeScript, and App 
 - **Next.js 16** - React framework with App Router
 - **TypeScript** - Type-safe development with strict mode enabled
 - **React 19** - Latest React with Server Components
+- **Tailwind CSS** - Utility-first CSS framework
+- **shadcn/ui** - Accessible and customizable component library
 - **Playwright** - End-to-end testing
 - **ESLint** - Code linting
 - **pnpm** - Fast, disk space efficient package manager
@@ -125,6 +127,40 @@ Ce projet inclut des commandes personnalisées pour faciliter le développement 
 - `/doc [sujet]` - Génère ou met à jour la documentation
 
 Consultez [.claude/commands/README.md](.claude/commands/README.md) pour plus de détails.
+
+## UI Components & Design System
+
+TrustDoc utilise **Tailwind CSS** et **shadcn/ui** pour le design system.
+
+### Composants disponibles
+
+- **Button** - Bouton avec variantes (default, secondary, outline, ghost, link)
+- **Card** - Carte avec header, content, footer
+- **Badge** - Badge de statut
+- **Input/Textarea** - Champs de formulaire
+- **Label** - Labels accessibles
+- **Dialog** - Modales
+- **Tabs** - Onglets
+- **Toast** - Notifications
+
+### Dark Mode
+
+Le dark mode est activé par défaut avec le toggle dans la navbar:
+- Thème clair/sombre/système
+- Basé sur `next-themes`
+- CSS variables pour les couleurs
+
+### Documentation complète
+
+Consultez [docs/UI_COMPONENTS.md](docs/UI_COMPONENTS.md) pour:
+- Guide d'utilisation de chaque composant
+- Exemples de code
+- Conventions et bonnes pratiques
+- Comment ajouter de nouveaux composants
+
+### Styleguide
+
+Visualisez tous les composants sur [http://localhost:3000/styleguide](http://localhost:3000/styleguide)
 
 ## Next Steps
 
