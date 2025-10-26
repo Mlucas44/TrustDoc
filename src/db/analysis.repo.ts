@@ -6,9 +6,9 @@
 
 import "@/src/lib/server-only";
 
-import { prisma } from "@/src/lib/prisma";
+import { Prisma, type ContractType } from "@prisma/client";
 
-import type { ContractType, Prisma } from "@prisma/client";
+import { prisma } from "@/src/lib/prisma";
 
 export type AppAnalysis = {
   id: string;
@@ -18,8 +18,8 @@ export type AppAnalysis = {
   textLength: number;
   summary: string | null;
   riskScore: number;
-  redFlags: unknown;
-  clauses: unknown;
+  redFlags: Prisma.JsonValue | null;
+  clauses: Prisma.JsonValue | null;
   createdAt: Date;
   deletedAt: Date | null;
 };
@@ -31,9 +31,9 @@ export type CreateAnalysisInput = {
   textLength: number;
   summary?: string;
   riskScore: number;
-  redFlags?: unknown;
-  clauses?: unknown;
-  aiResponse?: unknown;
+  redFlags?: Prisma.InputJsonValue;
+  clauses?: Prisma.InputJsonValue;
+  aiResponse?: Prisma.InputJsonValue;
 };
 
 export type ListAnalysesOptions = {
@@ -69,9 +69,9 @@ export class AnalysisRepo {
         textLength: input.textLength,
         summary: input.summary,
         riskScore: input.riskScore,
-        redFlags: input.redFlags as Prisma.JsonValue,
-        clauses: input.clauses as Prisma.JsonValue,
-        aiResponse: input.aiResponse as Prisma.JsonValue,
+        redFlags: input.redFlags ?? Prisma.JsonNull,
+        clauses: input.clauses ?? Prisma.JsonNull,
+        aiResponse: input.aiResponse ?? Prisma.JsonNull,
       },
       select: {
         id: true,

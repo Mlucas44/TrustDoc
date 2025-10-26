@@ -125,6 +125,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Load CI environment variables
+        run: cp .env.ci .env.local
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
       - name: Run TypeScript type check
         run: pnpm typecheck
 
