@@ -43,7 +43,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Load CI environment variables
-        run: cp .env.ci .env.local
+        run: cp .env.ci .env
 
       - name: Validate environment variables
         run: pnpm env:check
@@ -123,7 +123,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Load CI environment variables
-        run: cp .env.ci .env.local
+        run: cp .env.ci .env
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -224,7 +224,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Load CI environment variables
-        run: cp .env.ci .env.local
+        run: cp .env.ci .env
 
       - name: Build application
         run: pnpm build
