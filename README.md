@@ -268,6 +268,68 @@ NEXT_PUBLIC_APP_URL=https://trustdoc-git-main.vercel.app
 NEXTAUTH_URL=https://trustdoc-git-main.vercel.app
 ```
 
+## Database
+
+TrustDoc uses **PostgreSQL** via **Supabase** with **Prisma ORM** for type-safe database access.
+
+### Quick Setup
+
+1. **Get Supabase Connection String**:
+   - Go to [Supabase Dashboard](https://supabase.com/dashboard)
+   - Settings → Database → Connection String (URI)
+
+2. **Add to `.env.local`**:
+
+   ```bash
+   DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
+   ```
+
+3. **Run Migrations**:
+
+   ```bash
+   pnpm db:generate    # Generate Prisma Client
+   pnpm db:migrate     # Create tables
+   pnpm db:seed        # Add test data (optional)
+   ```
+
+4. **Open Prisma Studio** (optional):
+   ```bash
+   pnpm db:studio      # Visual database browser
+   ```
+
+### Database Schema
+
+**User Model**:
+
+- `id` (PK), `email` (unique), `credits` (≥0)
+- Relations: User → Analysis (1-N)
+
+**Analysis Model**:
+
+- `id` (PK), `userId` (FK), `filename`, `type` (enum)
+- `summary`, `riskScore` (0-100), `redFlags`, `clauses`
+- Soft-delete support (`deletedAt`)
+
+**Contract Types**: CGU, FREELANCE, EMPLOI, NDA, DEVIS, PARTENARIAT, AUTRE
+
+### Database Scripts
+
+```bash
+pnpm db:generate         # Generate Prisma Client
+pnpm db:migrate          # Create/apply migrations
+pnpm db:seed             # Seed test data
+pnpm db:studio           # Open Prisma Studio GUI
+pnpm db:reset            # Reset database (deletes all data!)
+```
+
+📚 **Full documentation**: [docs/DATABASE.md](docs/DATABASE.md)
+
+- Entity relationship diagram
+- Complete schema reference
+- Repository pattern usage
+- Migration guide
+- Troubleshooting
+
 ## Code Quality & Conventions
 
 TrustDoc applique des standards stricts de qualité de code:
