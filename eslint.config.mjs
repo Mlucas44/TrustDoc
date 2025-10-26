@@ -103,10 +103,22 @@ export default [
     },
   },
   {
-    // Scripts exception: allow console.log in scripts and prisma seed
+    // Scripts and Prisma: disable parserOptions.project and allow console.log
+    // These files are excluded from tsconfig.json (not part of Next.js build)
     files: ["scripts/**/*.{js,ts}", "prisma/**/*.{js,ts}"],
+    languageOptions: {
+      parserOptions: {
+        project: null, // Disable project-based linting for these files
+      },
+    },
     rules: {
       "no-console": "off",
+      // Disable TypeScript rules that require type information
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/no-misused-promises": "off",
+      "@typescript-eslint/await-thenable": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/require-await": "off",
     },
   },
   {
