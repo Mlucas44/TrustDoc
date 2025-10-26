@@ -20,13 +20,33 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /**
- * Prisma Client instance with logging configuration
+ * Prisma Client instance with logging configuration and query duration tracking
  */
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: env.server.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+const createPrismaClient = () => {
+  const client = new PrismaClient({
+    log:
+      env.server.NODE_ENV === "development"
+        ? [
+            { emit: "event", level: "query" },
+            { emit: "stdout", level: "error" },
+            { emit: "stdout", level: "warn" },
+          ]
+        : ["error"],
   });
+
+  // Query duration logging in development
+  if (env.server.NODE_ENV === "development") {
+    client.$on("query" as never, (e: { query: string; duration: number }) => {
+      if (e.duration > 100) {
+        console.warn(`🐌 Slow Query [${e.duration}ms]: ${e.query.substring(0, 100)}...`);
+      }
+    });
+  }
+
+  return client;
+};
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 // In development, store the client on globalThis to prevent hot-reload issues
 if (env.server.NODE_ENV !== "production") {

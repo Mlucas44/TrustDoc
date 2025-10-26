@@ -51,13 +51,32 @@ src/env.ts                 # Environment validation & type definitions
 
 ### Supabase (Database & Auth)
 
-| Variable                        | Scope  | Required | Description              | Example                   |
-| ------------------------------- | ------ | -------- | ------------------------ | ------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Client | Yes      | Supabase project URL     | `https://xxx.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client | Yes      | Public anon key          | `eyJhbGciOiJIUzI1NiIs...` |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Server | Yes      | Private service role key | `eyJhbGciOiJIUzI1NiIs...` |
+| Variable                        | Scope  | Required | Description                                 | Example                                                |
+| ------------------------------- | ------ | -------- | ------------------------------------------- | ------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Client | Yes      | Supabase project URL                        | `https://xxx.supabase.co`                              |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client | Yes      | Public anon key                             | `eyJhbGciOiJIUzI1NiIs...`                              |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Server | Yes      | Private service role key                    | `eyJhbGciOiJIUzI1NiIs...`                              |
+| `DATABASE_URL`                  | Server | Yes      | **Pooled** Postgres connection (pgBouncer)  | `postgresql://postgres.xxx:[PWD]@...pooler...?pgbo...` |
+| `SHADOW_DATABASE_URL`           | Server | No       | **Direct** Postgres connection (migrations) | `postgresql://postgres:[PWD]@db.xxx...?sslmode=...`    |
 
-**Where to get**: [Supabase Dashboard](https://supabase.com/dashboard) → Project Settings → API
+**Where to get**:
+
+- **API keys**: [Supabase Dashboard](https://supabase.com/dashboard) → Project Settings → API
+- **Connection strings**: [Supabase Dashboard](https://supabase.com/dashboard) → Project Settings → Database
+
+**Important**: `DATABASE_URL` must use the **Transaction pooler** (port 6543) with these query parameters:
+
+```
+?pgbouncer=true&connection_limit=1&pool_timeout=5&connect_timeout=5&sslmode=require
+```
+
+`SHADOW_DATABASE_URL` should use the **Direct connection** (port 5432) for running migrations:
+
+```
+?sslmode=require
+```
+
+See [README.md](../README.md#database) for detailed setup instructions.
 
 ### NextAuth (Authentication)
 

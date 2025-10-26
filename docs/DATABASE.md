@@ -7,11 +7,20 @@ This guide explains the database schema, setup, and usage for TrustDoc.
 - [Overview](#overview)
 - [Database Schema](#database-schema)
 - [Setup](#setup)
+- [Connection Pooling & Performance](#connection-pooling--performance)
+  - [Why Connection Pooling?](#why-connection-pooling)
+  - [Connection String Configuration](#connection-string-configuration)
+  - [Singleton Pattern](#singleton-pattern)
+  - [Error Handling & Retry Logic](#error-handling--retry-logic)
+  - [Observability](#observability)
+  - [Runtime Requirements](#runtime-requirements)
+  - [Load Testing](#load-testing)
 - [Migrations](#migrations)
 - [Seed Data](#seed-data)
 - [Repositories](#repositories)
 - [Scripts Reference](#scripts-reference)
 - [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
 
 ---
 
@@ -194,6 +203,203 @@ Creates:
 
 - 1 test user: `test@example.com` (10 credits)
 - 2 sample analyses
+
+---
+
+## Connection Pooling & Performance
+
+### Why Connection Pooling?
+
+Serverless environments like Vercel create ephemeral function instances that can quickly exhaust database connections. TrustDoc uses **pgBouncer** (Supabase's connection pooler) to solve this:
+
+**Architecture:**
+
+```
+Next.js API Route → PrismaClient (Singleton) → pgBouncer (Transaction Mode) → PostgreSQL
+```
+
+**Benefits:**
+
+- ✅ **Prevents "too many connections" errors** - Reuses existing connections
+- ✅ **Stable response times** - No connection establishment overhead
+- ✅ **Serverless-optimized** - Works with ephemeral function instances
+- ✅ **Automatic retries** - Handles transient network failures
+
+### Connection String Configuration
+
+**DATABASE_URL (Pooled - Runtime)**
+
+```bash
+postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=5&connect_timeout=5&sslmode=require
+```
+
+**Key Parameters:**
+
+- `port=6543` - Transaction pooler (pgBouncer)
+- `pgbouncer=true` - Enable pgBouncer mode
+- `connection_limit=1` - One connection per Prisma Client instance (serverless best practice)
+- `pool_timeout=5` - Wait max 5s for available connection
+- `connect_timeout=5` - Connection establishment timeout
+- `sslmode=require` - Force SSL encryption
+
+**SHADOW_DATABASE_URL (Direct - Migrations)**
+
+```bash
+postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require
+```
+
+**Why separate URLs?**
+
+- **Runtime queries** use pooled connection (fast, limited operations)
+- **Schema migrations** use direct connection (full DDL support)
+
+### Singleton Pattern
+
+The Prisma Client is instantiated **once per process** to prevent connection multiplication:
+
+```typescript
+// src/lib/prisma.ts
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (env.server.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma; // Survive hot-reloads in dev
+}
+```
+
+**Benefits:**
+
+- ✅ No duplicate connections during development hot-reloads
+- ✅ Single connection pool per Node.js process
+- ✅ Automatic cleanup on process exit
+
+### Error Handling & Retry Logic
+
+Use the `withDb` helper for automatic error classification and retry logic:
+
+```typescript
+import { withDb, withDbRetry } from "@/src/lib/db-helpers";
+
+// Basic usage (throws DbError with classification)
+const user = await withDb(async (db) => {
+  return db.user.findUnique({ where: { id: userId } });
+});
+
+// With automatic retry for transient errors
+const result = await withDbRetry(
+  async (db) => {
+    return db.analysis.create({ data: { ... } });
+  },
+  3, // max retries
+  100 // base delay (ms) - uses exponential backoff
+);
+```
+
+**Error Types:**
+
+- `POOL_TIMEOUT` - Connection pool exhausted (retryable)
+- `TOO_MANY_CONNECTIONS` - Database overloaded (retryable)
+- `CONNECTION_TIMEOUT` - Network issue (retryable)
+- `CONSTRAINT_VIOLATION` - Unique constraint (not retryable)
+- `TRANSIENT` - Temporary failure (retryable)
+
+### Observability
+
+#### Query Duration Logging (Development)
+
+Slow queries (>100ms) are automatically logged in development:
+
+```typescript
+// Logged in console
+🐌 Slow Query [247ms]: SELECT * FROM "users" WHERE "id" = $1...
+```
+
+Configuration in `src/lib/prisma.ts`:
+
+```typescript
+if (env.server.NODE_ENV === "development") {
+  client.$on("query" as never, (e: { query: string; duration: number }) => {
+    if (e.duration > 100) {
+      console.warn(`🐌 Slow Query [${e.duration}ms]: ${e.query.substring(0, 100)}...`);
+    }
+  });
+}
+```
+
+#### Health Check Endpoint
+
+Monitor database connectivity and performance:
+
+```bash
+curl http://localhost:3000/api/health/db
+```
+
+**Success Response (<300ms expected):**
+
+```json
+{
+  "status": "ok",
+  "db": "ok",
+  "responseTime": 42,
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+**Error Response:**
+
+```json
+{
+  "status": "error",
+  "db": "error",
+  "error": "Connection timeout",
+  "responseTime": 5003,
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+Use this endpoint for:
+
+- Kubernetes/Docker health probes
+- Uptime monitoring (UptimeRobot, Pingdom, etc.)
+- Load testing validation
+
+### Runtime Requirements
+
+**Important:** Prisma requires Node.js runtime (not Edge). Force Node.js runtime in API routes:
+
+```typescript
+// app/api/your-route/route.ts
+export const runtime = "nodejs"; // Required for Prisma
+
+export async function GET() {
+  const users = await prisma.user.findMany();
+  return Response.json(users);
+}
+```
+
+**Why?** Edge Runtime doesn't support Prisma's native database drivers (uses WASM, no TCP sockets).
+
+### Load Testing
+
+Test connection pooling under load:
+
+```bash
+# Install Apache Bench
+# macOS: brew install httpd
+# Ubuntu: sudo apt install apache2-utils
+
+# 20 concurrent requests to health endpoint
+ab -n 20 -c 20 http://localhost:3000/api/health/db
+```
+
+**Expected results:**
+
+- ✅ All requests succeed (no "too many connections")
+- ✅ Response time <300ms
+- ✅ No connection timeout errors
 
 ---
 

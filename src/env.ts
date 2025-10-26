@@ -20,7 +20,13 @@ const serverSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 
   // Database
+  // Pooled connection for runtime queries (via pgBouncer)
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid PostgreSQL connection string"),
+  // Direct connection for migrations (no pooling)
+  SHADOW_DATABASE_URL: z
+    .string()
+    .url("SHADOW_DATABASE_URL must be a valid PostgreSQL connection string")
+    .optional(),
 
   // Supabase
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "Supabase service role key is required"),

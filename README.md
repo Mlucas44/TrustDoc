@@ -152,7 +152,7 @@ TrustDoc/
 
 ## API Endpoints
 
-### Health Check
+### Health Checks
 
 **GET** `/api/health`
 
@@ -163,6 +163,33 @@ Returns the application health status.
 ```json
 {
   "status": "ok"
+}
+```
+
+**GET** `/api/health/db`
+
+Verifies database connectivity and performance.
+
+**Success Response (200):**
+
+```json
+{
+  "status": "ok",
+  "db": "ok",
+  "responseTime": 42,
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+**Error Response (503):**
+
+```json
+{
+  "status": "error",
+  "db": "error",
+  "error": "Connection timeout",
+  "responseTime": 5003,
+  "timestamp": "2025-01-15T10:30:00.000Z"
 }
 ```
 
@@ -272,30 +299,79 @@ NEXTAUTH_URL=https://trustdoc-git-main.vercel.app
 
 TrustDoc uses **PostgreSQL** via **Supabase** with **Prisma ORM** for type-safe database access.
 
+### Connection Pooling Architecture
+
+```
+Next.js App Router → PrismaClient (Singleton) → pgBouncer → PostgreSQL (Supabase)
+```
+
+**Why pooling?**
+Serverless environments (like Vercel) create new function instances that can exhaust database connections. Connection pooling via pgBouncer ensures:
+
+- ✅ Stable response times under load
+- ✅ No "too many connections" errors
+- ✅ Efficient connection reuse
+- ✅ Automatic retry for transient failures
+
 ### Quick Setup
 
-1. **Get Supabase Connection String**:
-   - Go to [Supabase Dashboard](https://supabase.com/dashboard)
-   - Settings → Database → Connection String (URI)
+1. **Get Supabase Connection Strings**:
+   - Go to [Supabase Dashboard](https://supabase.com/dashboard) → Settings → Database
+   - Copy **two** connection strings:
+     - **Transaction pooler** (port 6543) → for `DATABASE_URL`
+     - **Direct connection** (port 5432) → for `SHADOW_DATABASE_URL`
 
 2. **Add to `.env.local`**:
 
    ```bash
-   DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
+   # POOLED connection (for runtime queries via pgBouncer)
+   DATABASE_URL=postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=5&connect_timeout=5&sslmode=require
+
+   # DIRECT connection (for migrations, no pooling)
+   SHADOW_DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require
    ```
+
+   **Important query parameters:**
+   - `pgbouncer=true` - Enable pgBouncer mode
+   - `connection_limit=1` - Limit to 1 connection per client (serverless best practice)
+   - `pool_timeout=5` - Timeout after 5s if pool exhausted
+   - `connect_timeout=5` - Connection establishment timeout
+   - `sslmode=require` - Force SSL encryption
 
 3. **Run Migrations**:
 
    ```bash
    pnpm db:generate    # Generate Prisma Client
-   pnpm db:migrate     # Create tables
+   pnpm db:migrate     # Create tables (uses SHADOW_DATABASE_URL)
    pnpm db:seed        # Add test data (optional)
    ```
 
-4. **Open Prisma Studio** (optional):
+4. **Verify Database Health**:
+
+   ```bash
+   # Start dev server
+   pnpm dev
+
+   # Check database connectivity
+   curl http://localhost:3000/api/health/db
+   # Should return: {"status":"ok","db":"ok","responseTime":42,...}
+   ```
+
+5. **Open Prisma Studio** (optional):
    ```bash
    pnpm db:studio      # Visual database browser
    ```
+
+### Runtime Requirements
+
+**API Routes using Prisma must force Node.js runtime** (not Edge):
+
+```typescript
+// app/api/your-route/route.ts
+export const runtime = "nodejs"; // Required for Prisma
+```
+
+Edge Runtime doesn't support Prisma's native database drivers. All database operations must run in Node.js runtime.
 
 ### Database Schema
 
