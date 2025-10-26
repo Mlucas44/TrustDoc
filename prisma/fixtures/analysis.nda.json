@@ -1,0 +1,64 @@
+{
+  "filename": "NDA_TechStartup_2025-01-20.pdf",
+  "type": "NDA",
+  "textLength": 2890,
+  "summary": "Accord de confidentialité bilatéral pour une collaboration sur un projet tech innovant. Durée de 3 ans avec définition large des informations confidentielles. Clause de non-sollicitation incluse.",
+  "riskScore": 42,
+  "redFlags": [
+    {
+      "title": "Définition des informations confidentielles très large",
+      "severity": "medium",
+      "why": "La définition englobe pratiquement toute information échangée, même publique ou déjà connue.",
+      "clause_excerpt": "Sont considérées comme confidentielles toutes informations, qu'elles soient écrites, orales ou visuelles, échangées entre les parties."
+    },
+    {
+      "title": "Durée excessive de l'obligation",
+      "severity": "medium",
+      "why": "Une obligation de confidentialité de 5 ans après la fin de l'accord est inhabituellement longue.",
+      "clause_excerpt": "Les obligations de confidentialité survivront pendant cinq (5) ans après la fin du présent accord."
+    },
+    {
+      "title": "Sanctions disproportionnées",
+      "severity": "high",
+      "why": "Les pénalités en cas de violation (100 000€) sont excessives et pourraient être considérées comme abusives.",
+      "clause_excerpt": "En cas de violation de la confidentialité, la partie fautive devra verser une indemnité forfaitaire de 100 000 euros."
+    }
+  ],
+  "clauses": [
+    {
+      "id": 1,
+      "type": "Définition des informations confidentielles",
+      "content": "Toute information échangée entre les parties, sous quelque forme que ce soit, est présumée confidentielle sauf si elle est explicitement marquée comme publique.",
+      "page": 1
+    },
+    {
+      "id": 2,
+      "type": "Obligations de confidentialité",
+      "content": "Chaque partie s'engage à ne pas divulguer les informations confidentielles à des tiers et à les protéger avec le même niveau de protection que ses propres informations confidentielles.",
+      "page": 2
+    },
+    {
+      "id": 3,
+      "type": "Durée de l'engagement",
+      "content": "Le présent accord est valable pour une durée de trois (3) ans. Les obligations de confidentialité survivent pendant cinq (5) ans après la fin de l'accord.",
+      "page": 3
+    },
+    {
+      "id": 4,
+      "type": "Exceptions",
+      "content": "Ne sont pas considérées comme confidentielles les informations: (a) déjà publiques, (b) légalement requises par les autorités, (c) développées indépendamment.",
+      "page": 3
+    },
+    {
+      "id": 5,
+      "type": "Sanctions",
+      "content": "Toute violation des obligations de confidentialité entraînera le versement d'une indemnité forfaitaire de 100 000 euros, sans préjudice des autres recours.",
+      "page": 4
+    }
+  ],
+  "aiResponse": {
+    "model": "gpt-4",
+    "analyzed_at": "2025-01-20T16:45:00.000Z",
+    "confidence": 0.87
+  }
+}

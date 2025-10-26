@@ -1,0 +1,58 @@
+{
+  "filename": "CGU_Plateforme_2025-01-15.pdf",
+  "type": "CGU",
+  "textLength": 3420,
+  "summary": "Conditions générales d'utilisation d'une plateforme SaaS. Inclut des clauses standard sur la propriété intellectuelle, l'utilisation des données, et la limitation de responsabilité. Conforme au RGPD avec quelques points à clarifier.",
+  "riskScore": 25,
+  "redFlags": [
+    {
+      "title": "Utilisation des données peu claire",
+      "severity": "medium",
+      "why": "La clause ne précise pas suffisamment quelles données sont collectées et dans quel but.",
+      "clause_excerpt": "La Plateforme peut collecter et utiliser vos données pour améliorer ses services et à des fins statistiques."
+    },
+    {
+      "title": "Résiliation unilatérale",
+      "severity": "low",
+      "why": "La plateforme se réserve le droit de résilier sans préavis dans certaines conditions non précisément définies.",
+      "clause_excerpt": "Nous nous réservons le droit de suspendre ou résilier votre accès à tout moment, pour quelque raison que ce soit."
+    }
+  ],
+  "clauses": [
+    {
+      "id": 1,
+      "type": "Propriété intellectuelle",
+      "content": "L'ensemble du contenu de la Plateforme (textes, images, vidéos, logos) est protégé par le droit d'auteur. Toute reproduction non autorisée est interdite.",
+      "page": 2
+    },
+    {
+      "id": 2,
+      "type": "Utilisation des données",
+      "content": "La Plateforme peut collecter et utiliser vos données personnelles conformément à sa politique de confidentialité. Ces données incluent nom, email, données d'utilisation.",
+      "page": 3
+    },
+    {
+      "id": 3,
+      "type": "Responsabilité limitée",
+      "content": "La Plateforme décline toute responsabilité en cas de dommages indirects, pertes de données ou manque à gagner résultant de l'utilisation du service.",
+      "page": 4
+    },
+    {
+      "id": 4,
+      "type": "Résiliation",
+      "content": "L'utilisateur peut résilier son compte à tout moment via les paramètres. La Plateforme se réserve le droit de suspendre ou résilier l'accès en cas de violation des CGU.",
+      "page": 5
+    },
+    {
+      "id": 5,
+      "type": "Juridiction compétente",
+      "content": "Tout litige relatif aux présentes CGU sera soumis aux tribunaux compétents de Paris, France.",
+      "page": 6
+    }
+  ],
+  "aiResponse": {
+    "model": "gpt-4",
+    "analyzed_at": "2025-01-15T10:30:00.000Z",
+    "confidence": 0.89
+  }
+}

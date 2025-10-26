@@ -1,0 +1,64 @@
+{
+  "filename": "Freelance_Acme-Corp_2025-02-10.pdf",
+  "type": "FREELANCE",
+  "textLength": 5680,
+  "summary": "Contrat de prestation freelance pour une mission de développement web. Durée 6 mois, paiement à 30 jours. Attention à la clause de non-concurrence très étendue et à l'absence de clause de résiliation anticipée.",
+  "riskScore": 58,
+  "redFlags": [
+    {
+      "title": "ATTENTION : Clause de non-concurrence abusive",
+      "severity": "high",
+      "why": "La clause interdit toute activité dans le secteur tech pendant 2 ans sur toute l'Europe, ce qui est disproportionné et potentiellement illégal.",
+      "clause_excerpt": "Le Prestataire s'interdit, pendant une durée de deux (2) ans à compter de la fin de la mission, d'exercer toute activité concurrente sur le territoire européen."
+    },
+    {
+      "title": "Pas de clause de résiliation anticipée",
+      "severity": "medium",
+      "why": "L'absence de clause de résiliation anticipée vous engage pour toute la durée sans possibilité de sortie.",
+      "clause_excerpt": "La mission est fixée pour une durée ferme de 6 mois. Aucune résiliation anticipée n'est prévue sauf accord des deux parties."
+    },
+    {
+      "title": "Propriété intellectuelle déséquilibrée",
+      "severity": "medium",
+      "why": "Le client devient propriétaire de tout code développé, y compris les outils/frameworks que vous avez créés avant la mission.",
+      "clause_excerpt": "L'ensemble des développements, codes sources et outils créés dans le cadre de la mission deviennent la propriété exclusive du Client."
+    }
+  ],
+  "clauses": [
+    {
+      "id": 1,
+      "type": "Rémunération",
+      "content": "Le Prestataire sera rémunéré au tarif journalier de 500€ HT. Facturation mensuelle avec paiement à 30 jours fin de mois.",
+      "page": 1
+    },
+    {
+      "id": 2,
+      "type": "Durée de la mission",
+      "content": "La mission est fixée pour une durée de six (6) mois à compter du 1er mars 2025. Prolongation possible par avenant.",
+      "page": 1
+    },
+    {
+      "id": 3,
+      "type": "Propriété intellectuelle",
+      "content": "L'ensemble des développements réalisés dans le cadre de la mission deviennent la propriété exclusive du Client dès leur création.",
+      "page": 2
+    },
+    {
+      "id": 4,
+      "type": "Confidentialité",
+      "content": "Le Prestataire s'engage à ne divulguer aucune information confidentielle obtenue dans le cadre de la mission, pendant et après celle-ci.",
+      "page": 3
+    },
+    {
+      "id": 5,
+      "type": "Clause de non-concurrence",
+      "content": "Le Prestataire s'interdit d'exercer toute activité concurrente pendant deux ans sur le territoire européen après la fin de la mission.",
+      "page": 4
+    }
+  ],
+  "aiResponse": {
+    "model": "gpt-4",
+    "analyzed_at": "2025-02-10T14:22:00.000Z",
+    "confidence": 0.92
+  }
+}

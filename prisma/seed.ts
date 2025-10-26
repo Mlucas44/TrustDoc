@@ -1,81 +1,261 @@
 /**
  * Prisma Database Seed Script
  *
- * Creates test data for development:
- * - 1 test user with 10 credits
- * - 2 sample analyses
+ * Creates realistic test data for development:
+ * - 2 demo users (with/without credits)
+ * - 10 varied analyses across all contract types
+ * - Spread over 30 days for pagination testing
  *
- * Usage: pnpm db:seed
+ * Features:
+ * - Security guards (refuses production DB)
+ * - Deterministic mode (SEED_DETERMINISTIC=true)
+ * - Selective seeding (--only=users|analyses)
+ * - Clean purge before seeding
+ *
+ * Usage:
+ *   pnpm db:seed                    # Full seed
+ *   pnpm db:seed --only=users       # Users only
+ *   pnpm db:seed --only=analyses    # Analyses only
+ *   SEED_DETERMINISTIC=true pnpm db:seed  # Reproducible data
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
 
+import { resolve } from "path";
+
+// Load environment variables (.env.local takes precedence over .env)
+config({ path: resolve(process.cwd(), ".env.local") });
+config({ path: resolve(process.cwd(), ".env") });
+
+import { faker } from "@faker-js/faker";
 import { PrismaClient, ContractType } from "@prisma/client";
+
+import { makeAnalysis } from "./factories";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log("🌱 Starting database seed...");
+// Parse CLI arguments
+const args = process.argv.slice(2);
+const onlyFlag = args.find((arg) => arg.startsWith("--only="))?.split("=")[1];
 
-  // Create test user
-  const user = await prisma.user.upsert({
-    where: { email: "test@example.com" },
-    update: {},
-    create: {
-      email: "test@example.com",
+/**
+ * Security guard: refuse to seed production database
+ */
+function checkSafety() {
+  const dbUrl = process.env.DATABASE_URL || "";
+  const nodeEnv = process.env.NODE_ENV;
+
+  // Refuse production environment
+  if (nodeEnv === "production") {
+    throw new Error("❌ SAFETY: Refusing to seed production environment (NODE_ENV=production)");
+  }
+
+  // Refuse non-local database hosts
+  const dangerousHosts = [
+    "supabase.co",
+    "supabase.com",
+    "amazonaws.com",
+    "azure.com",
+    "googlecloud.com",
+  ];
+
+  const hasProductionHost = dangerousHosts.some((host) => dbUrl.toLowerCase().includes(host));
+
+  if (hasProductionHost && !dbUrl.includes("localhost")) {
+    throw new Error(
+      `❌ SAFETY: Refusing to seed remote database.\n` +
+        `   DATABASE_URL appears to be a production host.\n` +
+        `   Use localhost or explicitly bypass this check.`
+    );
+  }
+
+  console.log("✓ Safety check passed (local database detected)");
+}
+
+/**
+ * Configure deterministic mode if requested
+ */
+function setupDeterministicMode() {
+  if (process.env.SEED_DETERMINISTIC === "true") {
+    faker.seed(42); // Fixed seed for reproducibility
+    console.log("✓ Deterministic mode enabled (faker seed: 42)");
+  }
+}
+
+/**
+ * Clean database (respecting FK order)
+ */
+async function purgeDatabase() {
+  console.log("\n🧹 Purging database...");
+
+  // Delete in FK order: Analysis first, then User
+  const deletedAnalyses = await prisma.analysis.deleteMany({});
+  const deletedUsers = await prisma.user.deleteMany({});
+
+  console.log(`   Deleted ${deletedAnalyses.count} analyses, ${deletedUsers.count} users`);
+}
+
+/**
+ * Seed users
+ */
+async function seedUsers() {
+  console.log("\n👥 Creating users...");
+
+  // Demo user with credits
+  const demoUser = await prisma.user.create({
+    data: {
+      email: "demo@trustdoc.app",
       credits: 10,
     },
   });
 
-  console.log(`✓ Created user: ${user.email} (${user.id})`);
-
-  // Create sample analyses
-  const analysis1 = await prisma.analysis.create({
+  // Guest user without credits
+  const guestUser = await prisma.user.create({
     data: {
-      userId: user.id,
-      filename: "contrat_freelance.pdf",
-      type: ContractType.FREELANCE,
-      textLength: 1500,
-      summary: "Contrat de freelance avec clause de non-concurrence et paiement à 30 jours.",
-      riskScore: 35,
-      redFlags: [
-        "Clause de non-concurrence très large (2 ans, toute l'Europe)",
-        "Pas de clause de résiliation anticipée",
-      ],
-      clauses: [
-        { type: "payment", content: "Paiement à 30 jours", risk: "low" },
-        { type: "non-compete", content: "2 ans, Europe entière", risk: "high" },
-      ],
+      email: "invite@trustdoc.app",
+      credits: 0,
     },
   });
 
-  const analysis2 = await prisma.analysis.create({
-    data: {
-      userId: user.id,
-      filename: "cgu_plateforme.pdf",
-      type: ContractType.CGU,
-      textLength: 3000,
-      summary: "Conditions générales d'utilisation standard avec RGPD conforme.",
-      riskScore: 15,
-      redFlags: ["Collecte de données étendue"],
-      clauses: [
-        { type: "data", content: "Collecte de données utilisateur", risk: "medium" },
-        { type: "liability", content: "Limitation de responsabilité", risk: "low" },
-      ],
+  console.log(`   ✓ ${demoUser.email} (${demoUser.credits} credits)`);
+  console.log(`   ✓ ${guestUser.email} (${guestUser.credits} credits)`);
+
+  return { demoUser, guestUser };
+}
+
+/**
+ * Seed analyses with varied types and dates
+ */
+async function seedAnalyses(userId: string) {
+  console.log("\n📄 Creating analyses...");
+
+  const contractTypes = Object.values(ContractType);
+  const analyses = [];
+
+  // Create 10 analyses spread over 30 days
+  for (let i = 0; i < 10; i++) {
+    const contractType = contractTypes[i % contractTypes.length];
+    const daysAgo = Math.floor((i / 10) * 30); // Spread over 30 days
+
+    const analysisData = makeAnalysis({
+      userId,
+      contractType,
+      createdDaysAgo: daysAgo,
+    });
+
+    const analysis = await prisma.analysis.create({
+      data: analysisData,
+    });
+
+    analyses.push(analysis);
+
+    console.log(
+      `   ✓ ${analysis.filename.padEnd(40)} | ${analysis.type.padEnd(12)} | Risk: ${analysis.riskScore}% | ${daysAgo}d ago`
+    );
+  }
+
+  return analyses;
+}
+
+/**
+ * Display summary statistics
+ */
+function displaySummary(users: any[], analyses: any[]) {
+  const riskScores = analyses.map((a) => a.riskScore);
+  const minRisk = Math.min(...riskScores);
+  const maxRisk = Math.max(...riskScores);
+  const avgRisk = Math.round(riskScores.reduce((sum, r) => sum + r, 0) / riskScores.length);
+
+  const typeDistribution = analyses.reduce(
+    (acc, a) => {
+      acc[a.type] = (acc[a.type] || 0) + 1;
+      return acc;
     },
-  });
+    {} as Record<string, number>
+  );
 
-  console.log(`✓ Created analysis: ${analysis1.filename} (risk: ${analysis1.riskScore}%)`);
-  console.log(`✓ Created analysis: ${analysis2.filename} (risk: ${analysis2.riskScore}%)`);
+  console.log("\n" + "=".repeat(60));
+  console.log("✅ DATABASE SEED COMPLETED");
+  console.log("=".repeat(60));
+  console.log(`\n📊 Summary:`);
+  console.log(`   Users:     ${users.length}`);
+  console.log(`   Analyses:  ${analyses.length}`);
+  console.log(`\n📈 Risk Scores:`);
+  console.log(`   Min:       ${minRisk}%`);
+  console.log(`   Max:       ${maxRisk}%`);
+  console.log(`   Average:   ${avgRisk}%`);
+  console.log(`\n📑 Contract Types:`);
+  Object.entries(typeDistribution)
+    .sort(([, a], [, b]) => b - a)
+    .forEach(([type, count]) => {
+      console.log(`   ${type.padEnd(12)} ${count}`);
+    });
+  console.log(`\n💡 Test with:`);
+  console.log(`   pnpm db:studio    # Visual database browser`);
+  console.log(`   User login:       demo@trustdoc.app`);
+  console.log("=".repeat(60) + "\n");
+}
 
-  console.log("\n✅ Database seed completed!");
-  console.log(`   User: ${user.email}`);
-  console.log(`   Analyses: 2`);
+/**
+ * Main seeding function
+ */
+async function main() {
+  console.log("🌱 Starting database seed...");
+  console.log(`   Mode: ${process.env.SEED_DETERMINISTIC === "true" ? "Deterministic" : "Random"}`);
+  console.log(`   Filter: ${onlyFlag || "all"}`);
+
+  // Safety checks
+  checkSafety();
+  setupDeterministicMode();
+
+  // Purge existing data
+  if (!onlyFlag || onlyFlag === "all") {
+    await purgeDatabase();
+  }
+
+  let users: any[] = [];
+  let analyses: any[] = [];
+
+  // Seed users
+  if (!onlyFlag || onlyFlag === "users") {
+    const { demoUser, guestUser } = await seedUsers();
+    users = [demoUser, guestUser];
+  }
+
+  // Seed analyses
+  if (!onlyFlag || onlyFlag === "analyses") {
+    // Get or create demo user for analyses
+    let demoUser = await prisma.user.findUnique({
+      where: { email: "demo@trustdoc.app" },
+    });
+
+    if (!demoUser) {
+      console.log("\n⚠️  Demo user not found, creating it first...");
+      demoUser = await prisma.user.create({
+        data: {
+          email: "demo@trustdoc.app",
+          credits: 10,
+        },
+      });
+    }
+
+    analyses = await seedAnalyses(demoUser.id);
+  }
+
+  // Display summary
+  if (users.length > 0 || analyses.length > 0) {
+    // Fetch all for summary if partial seed
+    const allUsers = users.length > 0 ? users : await prisma.user.findMany();
+    const allAnalyses = analyses.length > 0 ? analyses : await prisma.analysis.findMany();
+
+    displaySummary(allUsers, allAnalyses);
+  }
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed failed:", e);
+    console.error("\n❌ Seed failed:", e.message);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {
