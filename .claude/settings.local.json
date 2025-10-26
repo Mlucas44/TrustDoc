@@ -9,7 +9,8 @@
       "Bash(pnpm start)",
       "Bash(curl:*)",
       "Bash(pnpm test:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(pnpm dlx:*)"
     ],
     "deny": [],
     "ask": []

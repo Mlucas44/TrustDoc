@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -25,20 +26,22 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="relative min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1">
-              <div className="container mx-auto px-4 py-8">{children}</div>
-            </main>
-          </div>
-          <Toaster />
-        </ThemeProvider>
+        <SessionProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="relative min-h-screen flex flex-col">
+              <Navbar />
+              <main className="flex-1">
+                <div className="container mx-auto px-4 py-8">{children}</div>
+              </main>
+            </div>
+            <Toaster />
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );

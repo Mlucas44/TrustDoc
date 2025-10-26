@@ -1,7 +1,7 @@
 import Link from "next/link";
 
+import { AuthButton } from "@/components/auth-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
 
 export function Navbar() {
   return (
@@ -28,7 +28,7 @@ export function Navbar() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost">Se connecter</Button>
+          <AuthButton />
         </div>
       </div>
     </header>

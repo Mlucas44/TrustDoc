@@ -39,6 +39,13 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1, "Google Client ID is required"),
   GOOGLE_CLIENT_SECRET: z.string().min(1, "Google Client Secret is required"),
 
+  // Email Provider (SMTP) - Optional for development
+  SMTP_HOST: z.string().min(1, "SMTP host is required").optional(),
+  SMTP_PORT: z.coerce.number().int().positive("SMTP port must be a positive integer").optional(),
+  SMTP_USER: z.string().min(1, "SMTP user is required").optional(),
+  SMTP_PASS: z.string().min(1, "SMTP password is required").optional(),
+  EMAIL_FROM: z.string().email("EMAIL_FROM must be a valid email address").optional(),
+
   // LLM / AI
   OPENAI_API_KEY: z.string().min(1, "OpenAI API key is required"),
   OLLAMA_BASE_URL: z.string().url().optional(), // Optional for local LLM
