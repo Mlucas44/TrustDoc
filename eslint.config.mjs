@@ -103,8 +103,8 @@ export default [
     },
   },
   {
-    // Scripts exception: allow console.log in scripts directory
-    files: ["scripts/**/*.{js,ts}"],
+    // Scripts exception: allow console.log in scripts and prisma seed
+    files: ["scripts/**/*.{js,ts}", "prisma/**/*.{js,ts}"],
     rules: {
       "no-console": "off",
     },

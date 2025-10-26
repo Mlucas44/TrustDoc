@@ -1,0 +1,82 @@
+// This is your Prisma schema file for TrustDoc
+// Documentation: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+/// Type of contract analyzed
+enum ContractType {
+  CGU          // Terms of Service / Conditions Générales d'Utilisation
+  FREELANCE    // Freelance Contract
+  EMPLOI       // Employment Contract
+  NDA          // Non-Disclosure Agreement
+  DEVIS        // Quote / Estimate
+  PARTENARIAT  // Partnership Agreement
+  AUTRE        // Other
+}
+
+// =============================================================================
+// User Model
+// =============================================================================
+
+/// User account with credit system
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  credits   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  analyses Analysis[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// =============================================================================
+// Analysis Model
+// =============================================================================
+
+/// Document analysis result
+model Analysis {
+  id       String       @id @default(cuid())
+  userId   String
+  filename String
+  type     ContractType @default(AUTRE)
+
+  // Analysis metadata
+  textLength Int @default(0)
+
+  // Analysis results
+  summary      String? @db.Text
+  riskScore    Int     @default(0) // 0-100
+  redFlags     Json?   // Array of red flags
+  clauses      Json?   // Array of clauses
+  aiResponse   Json?   // Full AI response for debugging
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+  @@index([deletedAt])
+  @@map("analyses")
+}
