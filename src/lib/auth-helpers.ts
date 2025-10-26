@@ -40,10 +40,7 @@ export async function getCurrentUser() {
     select: {
       id: true,
       email: true,
-      name: true,
-      image: true,
       credits: true,
-      emailVerified: true,
       createdAt: true,
     },
   });

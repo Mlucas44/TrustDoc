@@ -170,8 +170,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Load CI environment variables
+        run: cp .env.ci .env
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium

@@ -46,6 +46,7 @@ declare module "next-auth" {
 // =============================================================================
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // @ts-expect-error - Adapter version mismatch between @auth/prisma-adapter and NextAuth v5 beta
   adapter: PrismaAdapter(prisma),
 
   // Session strategy: database sessions (recommended for serverless)

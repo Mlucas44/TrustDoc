@@ -247,28 +247,41 @@ export async function POST(request: Request) {
 
 ## Route Protection
 
-The middleware automatically protects routes. Configure in `middleware.ts`:
+To protect routes, use the `requireAuth()` helper in Server Components or layouts:
 
-```ts
-export const config = {
-  matcher: [
-    // Protect all routes except:
-    // - Static files (_next/static, images, etc.)
-    // - Public routes (/, /auth/*)
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
-};
+```tsx
+// app/dashboard/layout.tsx
+import { requireAuth } from "@/src/lib/auth-helpers";
+
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  await requireAuth(); // Redirects to /auth/signin if not authenticated
+
+  return <div>{children}</div>;
+}
 ```
 
-To make routes public, exclude them in the matcher pattern.
+For individual pages:
+
+```tsx
+// app/dashboard/page.tsx
+import { requireAuth } from "@/src/lib/auth-helpers";
+
+export default async function DashboardPage() {
+  const session = await requireAuth();
+
+  return <div>Welcome {session.user.email}!</div>;
+}
+```
+
+**Note**: Middleware-based protection is not used because NextAuth with Prisma is incompatible with Edge Runtime. Manual protection in layouts/pages provides more flexibility and avoids Edge Runtime limitations.
 
 ## Troubleshooting
 
 ### "Adapter version mismatch" error
 
-The Prisma adapter version may conflict with NextAuth core. This is a known issue with NextAuth v5 beta. The app should still work correctly despite the TypeScript warning.
+The Prisma adapter version may conflict with NextAuth core. This is a known issue with NextAuth v5 beta. The app works correctly despite the TypeScript warning.
 
-**Workaround**: Add `// @ts-expect-error - Adapter version mismatch (NextAuth v5 beta)` above the adapter line in `src/auth.ts`.
+**Fixed**: A `// @ts-expect-error` comment has been added in `src/auth.ts` to suppress this warning.
 
 ### Email not sending
 
@@ -302,6 +315,12 @@ const user = await getCurrentUser(); // Fresh data from database
 console.log(user.credits); // Current balance
 ```
 
+### Edge Runtime / Middleware errors
+
+NextAuth with Prisma adapter cannot run in Edge Runtime (middleware). This is a Next.js limitation.
+
+**Solution**: Use `requireAuth()` helper in Server Components/layouts instead of middleware for route protection. This approach is more flexible and works with all Next.js features.
+
 ## Security Best Practices
 
 1. **Never commit `.env.local`** - Gitignored by default
@@ -316,8 +335,7 @@ console.log(user.credits); // Current balance
 ### Core Authentication Files
 
 - `src/auth.ts` - NextAuth configuration
-- `middleware.ts` - Route protection
-- `src/lib/auth-helpers.ts` - Server-side helpers
+- `src/lib/auth-helpers.ts` - Server-side helpers (requireAuth, getCurrentUser, etc.)
 - `app/api/auth/[...nextauth]/route.ts` - NextAuth API handler
 
 ### UI Components
