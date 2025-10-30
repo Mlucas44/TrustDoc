@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 7. Return success response
+    // 7. Return success response (including contract type if detected)
     return NextResponse.json(
       {
         textClean: preparedText.textClean,
@@ -228,6 +228,7 @@ export async function POST(request: NextRequest) {
         stats: preparedText.stats,
         meta: preparedText.meta,
         sections: preparedText.sections,
+        contractType: preparedText.contractType,
       },
       { status: 200 }
     );

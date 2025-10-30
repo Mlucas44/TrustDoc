@@ -57,10 +57,11 @@ model User {
 
 /// Document analysis result
 model Analysis {
-  id       String       @id @default(cuid())
-  userId   String
-  filename String
-  type     ContractType @default(AUTRE)
+  id             String       @id @default(cuid())
+  userId         String
+  filename       String
+  type           ContractType @default(AUTRE)
+  typeConfidence Float?       // Confidence score (0-1) from contract type detection
 
   // Analysis metadata
   textLength Int @default(0)

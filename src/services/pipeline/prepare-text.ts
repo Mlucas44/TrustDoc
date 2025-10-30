@@ -7,8 +7,11 @@
 
 import "server-only";
 
+import { detectContractType } from "@/src/services/detect/contract-type";
 import { parsePdfFromStorageWithTimeout } from "@/src/services/pdf/parse-pdf";
 import { normalizeContractText } from "@/src/services/text/normalize";
+
+import type { DetectionResult } from "@/src/schemas/detect";
 
 /**
  * Prepared text payload (ready for LLM)
@@ -51,6 +54,10 @@ export interface PreparedTextPayload {
     title?: string;
     headings: Array<{ level: 1 | 2 | 3; text: string; index: number }>;
   };
+  /**
+   * Contract type detection result
+   */
+  contractType?: DetectionResult;
 }
 
 /**
@@ -81,7 +88,8 @@ export interface PreparedTextPayload {
  */
 export async function prepareTextFromStorage(
   filePath: string,
-  timeoutMs = 20000
+  timeoutMs = 20000,
+  detectType = true
 ): Promise<PreparedTextPayload> {
   // 1. Parse PDF (errors are thrown directly)
   const pdfData = await parsePdfFromStorageWithTimeout(filePath, timeoutMs);
@@ -93,13 +101,26 @@ export async function prepareTextFromStorage(
     meta: pdfData.meta as Record<string, string>,
   });
 
-  // 3. Combine into final payload
+  // 3. Detect contract type (optional, can be disabled for performance)
+  let contractTypeResult: DetectionResult | undefined;
+  if (detectType) {
+    try {
+      contractTypeResult = await detectContractType(normalizeResult.textClean);
+    } catch (error) {
+      console.error("[prepareTextFromStorage] Contract type detection failed:", error);
+      // Don't fail the whole pipeline if detection fails
+      contractTypeResult = undefined;
+    }
+  }
+
+  // 4. Combine into final payload
   return {
     textClean: normalizeResult.textClean,
     textTokensApprox: normalizeResult.textTokensApprox,
     stats: normalizeResult.stats,
     meta: pdfData.meta,
     sections: normalizeResult.sections,
+    contractType: contractTypeResult,
   };
 }
 
