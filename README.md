@@ -1003,6 +1003,159 @@ if (response.status === 422) {
 }
 ```
 
+### Contract Type Detection
+
+TrustDoc automatically detects the type of contract using a hybrid approach combining fast heuristics and LLM validation.
+
+#### Supported Contract Types
+
+| Type            | Description                      | Examples                                        |
+| --------------- | -------------------------------- | ----------------------------------------------- |
+| **CGU**         | Terms of Service / General Terms | Platform T&Cs, user agreements, CGU/CGV         |
+| **FREELANCE**   | Independent Contractor Agreement | Freelance contracts, consulting agreements, MSA |
+| **EMPLOI**      | Employment Contract              | CDI, CDD, labor contracts                       |
+| **NDA**         | Non-Disclosure Agreement         | Confidentiality agreements, secrecy agreements  |
+| **DEVIS**       | Quote / Estimate                 | Price quotes, proposals, estimates              |
+| **PARTENARIAT** | Partnership Agreement            | Collaboration agreements, joint ventures, MOU   |
+| **AUTRE**       | Other / Unknown                  | Documents that don't fit above categories       |
+
+#### Detection Strategy
+
+**1. Heuristic Detection (Fast, < 200ms)**:
+
+- Title/header matching with bilingual aliases (FR/EN)
+- Weighted keyword scoring (discriminant terms)
+- Structural pattern matching (articles, clauses)
+- Evidence extraction with context
+
+**2. LLM Validation (When Needed, < 1.5s)**:
+
+- Called only if heuristic confidence < 0.8
+- OpenAI GPT-4o-mini for cost-efficiency
+- Budget-optimized prompts (≤ 300 tokens)
+- JSON-structured responses
+
+**3. Hybrid Orchestration**:
+
+- Use heuristic if confidence ≥ 0.8 (fast path)
+- Call LLM for validation if confidence < 0.8
+- Combine results with weighted scoring
+- Rate limiting (5 LLM calls max, refill 0.5/sec)
+
+#### API Endpoints
+
+**Standalone Detection**:
+
+```typescript
+POST /api/detect-type
+Content-Type: application/json
+
+// Request
+{
+  textClean: "Normalized contract text..."
+}
+
+// Success (200)
+{
+  type: "FREELANCE",
+  confidence: 0.92,
+  source: "hybrid",  // "heuristic", "llm", or "hybrid"
+  evidence: [
+    "Contains 'prestation de services' and 'facturation'",
+    "Mentions 'indépendant' and 'livrables'",
+    ...
+  ],
+  reason: "LLM confirmed freelance agreement with high confidence"
+}
+
+// Errors
+400 Bad Request - Missing or invalid textClean
+422 Unprocessable Entity - Text too short (< 200 chars)
+500 Internal Server Error - Detection failed
+```
+
+**Integrated in Pipeline**:
+
+The `/api/prepare` endpoint automatically includes contract type detection:
+
+```typescript
+POST /api/prepare
+Content-Type: application/json
+
+// Request
+{
+  filePath: "user-abc123/document.pdf"
+}
+
+// Response includes contractType
+{
+  textClean: "...",
+  textTokensApprox: 11250,
+  stats: { ... },
+  meta: { ... },
+  sections: { ... },
+  contractType: {
+    type: "FREELANCE",
+    confidence: 0.92,
+    source: "hybrid",
+    evidence: [...],
+    reason: "..."
+  }
+}
+```
+
+#### Usage Example
+
+```typescript
+// Method 1: Standalone detection
+const detectResponse = await fetch("/api/detect-type", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ textClean: normalizedText }),
+});
+
+const { type, confidence, source, evidence } = await detectResponse.json();
+console.log(`Detected: ${type} (confidence: ${confidence}, source: ${source})`);
+
+// Method 2: Integrated in prepare pipeline
+const prepareResponse = await fetch("/api/prepare", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ filePath: "user-abc/doc.pdf" }),
+});
+
+const { textClean, contractType } = await prepareResponse.json();
+console.log(`Contract type: ${contractType.type} (${contractType.confidence})`);
+```
+
+#### Performance Characteristics
+
+- **Heuristic only**: < 200ms for 5-10k characters
+- **Heuristic + LLM**: < 1.5s total (budget-controlled)
+- **Rate limiting**: Max 5 LLM calls, refill 0.5/sec (1 every 2 seconds)
+- **No content leakage**: Only short excerpts (≤ 200 chars) in evidence
+
+#### Keyword Examples
+
+**CGU Keywords**: utilisateur, service, plateforme, cookies, "données personnelles", "propriété intellectuelle"
+
+**FREELANCE Keywords**: prestations, mission, facturation, indépendant, livrables, honoraires, "taux journalier"
+
+**EMPLOI Keywords**: CDI, CDD, "période d'essai", salaire, "congés payés", hiérarchie, "convention collective"
+
+**NDA Keywords**: confidentiel, confidentialité, divulgation, "durée de confidentialité", "informations protégées"
+
+**DEVIS Keywords**: devis, acceptation, validité, "prix HT", "prix TTC", acompte, "bon de commande"
+
+**PARTENARIAT Keywords**: partenariat, coopération, "joint marketing", "exclusivité territoriale", collaboration
+
+#### Limitations
+
+- **Mixed documents**: Documents containing multiple contract types (e.g., CGU with NDA clause) will be classified as the dominant type
+- **Bilingual support**: Currently optimized for French and English; other languages may have lower accuracy
+- **Custom templates**: Non-standard contract structures may require manual review
+- **Confidence threshold**: Low confidence (< 0.5) results in "AUTRE" classification
+
 ### Testing
 
 ```bash
