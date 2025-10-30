@@ -45,11 +45,9 @@ export interface QuotaCheckResult {
  * ```
  */
 export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
-  // Check if user is authenticated
   const session = await getSession();
 
   if (session?.user?.id) {
-    // User is authenticated - check credits
     const user = await getCurrentUser();
 
     if (!user) {
@@ -61,7 +59,6 @@ export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
       };
     }
 
-    // Check if user has credits
     if (user.credits <= 0) {
       return {
         allowed: false,
@@ -79,7 +76,6 @@ export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
     };
   }
 
-  // User is NOT authenticated - check guest quota
   try {
     const guestId = await getOrCreateGuestId();
     await checkGuestQuota(guestId);

@@ -64,10 +64,8 @@ export async function consumeOnSuccess<T>(
   fn: () => Promise<T>,
   count = 1
 ): Promise<T> {
-  // 1. Validate sufficient credits first
   await requireCredits(userId, count);
 
-  // 2. Execute the function
   let result: T;
   try {
     result = await fn();
@@ -80,11 +78,9 @@ export async function consumeOnSuccess<T>(
     throw error;
   }
 
-  // 3. Function succeeded - consume credits
   try {
     await UserRepo.consumeCredits(userId, count);
   } catch (error) {
-    // This should rarely happen since we validated credits earlier
     console.error(
       `[consumeOnSuccess] Failed to consume credits after successful operation:`,
       error

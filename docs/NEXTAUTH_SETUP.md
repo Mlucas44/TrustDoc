@@ -179,7 +179,8 @@ export default async function ProtectedPage() {
 ### Authentication Helpers
 
 ```tsx
-import { getCurrentUser, requireAuth, checkCredits, deductCredits } from "@/src/lib/auth-helpers";
+import { getCurrentUser } from "@/src/auth/current-user";
+import { requireSession } from "@/src/auth/session";
 
 // Get current user with fresh data from database
 const user = await getCurrentUser();
@@ -208,7 +209,7 @@ if (!updatedUser) {
 ```tsx
 "use server";
 
-import { requireAuth } from "@/src/lib/auth-helpers";
+import { requireSession } from "@/src/auth/session";
 import { prisma } from "@/src/lib/prisma";
 
 export async function createAnalysis(documentId: string) {
@@ -251,7 +252,7 @@ To protect routes, use the `requireAuth()` helper in Server Components or layout
 
 ```tsx
 // app/dashboard/layout.tsx
-import { requireAuth } from "@/src/lib/auth-helpers";
+import { requireSession } from "@/src/auth/session";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   await requireAuth(); // Redirects to /auth/signin if not authenticated
@@ -264,7 +265,7 @@ For individual pages:
 
 ```tsx
 // app/dashboard/page.tsx
-import { requireAuth } from "@/src/lib/auth-helpers";
+import { requireSession } from "@/src/auth/session";
 
 export default async function DashboardPage() {
   const session = await requireAuth();
@@ -309,7 +310,7 @@ The Prisma adapter version may conflict with NextAuth core. This is a known issu
 Session data is cached. To get fresh credit balance:
 
 ```tsx
-import { getCurrentUser } from "@/src/lib/auth-helpers";
+import { getCurrentUser } from "@/src/auth/current-user";
 
 const user = await getCurrentUser(); // Fresh data from database
 console.log(user.credits); // Current balance

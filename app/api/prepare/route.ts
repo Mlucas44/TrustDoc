@@ -17,7 +17,7 @@ import {
   PdfParseError,
 } from "@/src/services/pdf/parse-pdf";
 import { prepareTextFromStorage } from "@/src/services/pipeline/prepare-text";
-import { StorageUploadError } from "@/src/services/storage";
+import { StorageUploadError, deleteFile } from "@/src/services/storage";
 import { TextTooShortError } from "@/src/services/text/normalize";
 
 export const runtime = "nodejs";
@@ -199,7 +199,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Log success (dev only)
+    // 5. Delete source file after successful preparation
+    try {
+      await deleteFile(filePath);
+    } catch (error) {
+      // Log but don't fail the request if deletion fails
+      console.error("[POST /api/prepare] Failed to delete source file:", error);
+    }
+
+    // 6. Log success (dev only)
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console
       console.log(`[POST /api/prepare] Success:`, {
@@ -212,7 +220,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 6. Return success response
+    // 7. Return success response
     return NextResponse.json(
       {
         textClean: preparedText.textClean,

@@ -18,7 +18,7 @@ import {
   PdfFileTooLargeError,
   PdfParseError,
 } from "@/src/services/pdf/parse-pdf";
-import { StorageUploadError } from "@/src/services/storage";
+import { StorageUploadError, deleteFile } from "@/src/services/storage";
 
 export const runtime = "nodejs";
 
@@ -185,7 +185,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Log success (dev only)
+    // 5. Delete source file after successful parsing
+    try {
+      await deleteFile(filePath);
+    } catch (error) {
+      // Log but don't fail the request if deletion fails
+      console.error("[POST /api/parse] Failed to delete source file:", error);
+    }
+
+    // 6. Log success (dev only)
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console
       console.log(`[POST /api/parse] Success:`, {
@@ -195,7 +203,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 6. Return success response
+    // 7. Return success response
     return NextResponse.json(
       {
         pages: parseResult.pages,
