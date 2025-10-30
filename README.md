@@ -243,6 +243,89 @@ const { session } = useRequireAuth({
 
 📚 **Full documentation**: [docs/NEXTAUTH_SETUP.md](docs/NEXTAUTH_SETUP.md)
 
+### Guest Mode (Free Trial)
+
+TrustDoc allows unauthenticated users to try the service with **3 free analyses per browser**.
+
+#### How it works
+
+- **Guest Identification**: Each browser gets a unique guest ID stored in an httpOnly cookie (`td_guest_id`)
+- **Quota Tracking**: Server-side database tracks usage (max 3 analyses)
+- **Quota Reset**: Automatically resets after 30 days
+- **Seamless Upgrade**: Sign in to switch from guest quota to user credits
+
+#### Data Model
+
+```typescript
+// Guest quota stored in PostgreSQL
+model GuestQuota {
+  id        String   @id  // UUID v4 guest identifier
+  used      Int      // Number of analyses consumed (0-3)
+  createdAt DateTime
+  expiresAt DateTime // 30 days from creation
+}
+```
+
+#### Cookies Used
+
+| Cookie           | Type     | Purpose                    | Duration |
+| ---------------- | -------- | -------------------------- | -------- |
+| `td_guest_id`    | httpOnly | Guest identifier (UUID v4) | 30 days  |
+| `td_guest_quota` | httpOnly | Quick UX hint (used count) | 30 days  |
+
+**Security**: All cookies are httpOnly, sameSite=lax, and signed server-side. No client-side tampering possible.
+
+#### API Endpoints
+
+```typescript
+// Initialize guest session
+POST /api/guest/init
+→ { guestId, used, remaining, limit }
+
+// Get current quota status
+GET /api/guest/status
+→ { guestId, used, remaining, limit }
+```
+
+#### Usage in Code
+
+```typescript
+// Server-side: Check quota before analysis
+import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
+
+const quotaCheck = await requireQuotaOrUserCredit();
+if (!quotaCheck.allowed) {
+  return NextResponse.json(
+    { error: quotaCheck.error, code: quotaCheck.errorCode },
+    { status: 402 }
+  );
+}
+
+// After successful analysis
+if (quotaCheck.isGuest) {
+  await consumeGuestQuota(quotaCheck.guestId);
+}
+```
+
+```tsx
+// Client-side: Display quota progress
+import { GuestProgress } from "@/components/guest/guest-progress";
+import { GuestQuotaExceededDialog } from "@/components/guest/guest-quota-exceeded-dialog";
+
+<GuestProgress showProgress />
+<GuestQuotaExceededDialog open={showDialog} onOpenChange={setShowDialog} />
+```
+
+#### Behavior & Limits
+
+- ✅ **First visit**: Initializes guestId, shows 0/3
+- ✅ **After 3 successful analyses**: 4th attempt blocked with upgrade CTA
+- ✅ **Failed analysis** (parsing error): Does NOT increment quota
+- ✅ **Sign in**: Guest mode disabled, switches to user credits
+- ✅ **New browser**: Separate guestId and independent quota
+- ✅ **Cookie cleared**: New guestId created, quota resets
+- ⏰ **30 days later**: Quota automatically resets
+
 ### Testing
 
 ```bash

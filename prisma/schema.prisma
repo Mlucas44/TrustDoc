@@ -133,3 +133,21 @@ model VerificationToken {
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
+
+// =============================================================================
+// Guest Quota Model
+// =============================================================================
+
+/// Guest user quota tracking (3 free analyses per browser)
+model GuestQuota {
+  id        String   @id @default(uuid()) // UUID v4 guest identifier
+  used      Int      @default(0) // Number of analyses consumed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime // Cookie expiration (30 days from creation)
+
+  @@index([id])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("guest_quotas")
+}
