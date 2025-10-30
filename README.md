@@ -502,6 +502,156 @@ static async consumeCredits(userId: string, count = 1) {
 
 This ensures **race conditions are prevented** when multiple requests occur simultaneously.
 
+### File Upload (Secure PDF Storage)
+
+TrustDoc provides secure, temporary file upload to Supabase Storage for PDF contract analysis.
+
+#### Key Features
+
+- **Private Storage**: Files stored in private Supabase bucket (no public access)
+- **File Validation**: PDF only, max 10 MB
+- **Rate Limiting**: 5 uploads per minute per IP
+- **Temporary Storage**: Files automatically deleted after analysis
+- **Mock Mode**: Local development without Supabase configuration
+
+#### Supabase Bucket Setup
+
+Create a private bucket named `contracts-temp`:
+
+1. Go to **Storage** → **Buckets** in Supabase dashboard
+2. Create bucket: `contracts-temp` (Private, 10 MB limit, PDF only)
+3. Apply RLS policies (service role only):
+
+```sql
+-- Policy 1: Service role can upload
+CREATE POLICY "Service role can upload files"
+ON storage.objects FOR INSERT
+TO service_role
+WITH CHECK (bucket_id = 'contracts-temp');
+
+-- Policy 2: Service role can read
+CREATE POLICY "Service role can read files"
+ON storage.objects FOR SELECT
+TO service_role
+USING (bucket_id = 'contracts-temp');
+
+-- Policy 3: Service role can delete
+CREATE POLICY "Service role can delete files"
+ON storage.objects FOR DELETE
+TO service_role
+USING (bucket_id = 'contracts-temp');
+```
+
+📚 **Full setup guide**: [docs/SUPABASE_STORAGE_SETUP.md](docs/SUPABASE_STORAGE_SETUP.md)
+
+#### Environment Variables
+
+```bash
+# Supabase (required for production)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Upload configuration
+UPLOAD_MAX_SIZE_MB=10
+UPLOAD_ALLOWED_MIME_TYPES=application/pdf
+
+# Development: Mock mode (bypass Supabase, save locally)
+MOCK_STORAGE=false
+```
+
+#### API Endpoint
+
+```typescript
+POST /api/upload
+Content-Type: multipart/form-data
+
+// Request body
+FormData {
+  file: File (PDF, ≤10 MB)
+}
+
+// Success (200)
+{
+  fileId: "cm4x5y6z7",
+  filename: "cm4x5y6z7-1699123456789.pdf",
+  size: 2048576,
+  mimeType: "application/pdf",
+  path: "user-abc123/cm4x5y6z7-1699123456789.pdf"
+}
+
+// Errors
+401 Unauthorized - Not authenticated
+402 Payment Required - Insufficient credits or quota exceeded
+413 Payload Too Large - File exceeds 10 MB
+415 Unsupported Media Type - File is not a PDF
+429 Too Many Requests - Rate limit exceeded (5/min)
+500 Internal Server Error - Upload failed
+```
+
+#### Client Component
+
+```tsx
+import { UploadDropzone } from "@/components/upload/upload-dropzone";
+
+<UploadDropzone
+  onUploadSuccess={(result) => {
+    console.log("Uploaded:", result.fileId);
+    // Proceed to analysis with result.fileId
+  }}
+  onUploadError={(error) => {
+    console.error("Upload failed:", error.error);
+  }}
+/>;
+```
+
+#### File Lifecycle
+
+1. **Upload**: User uploads PDF via dropzone
+2. **Validation**: Size (≤10 MB), type (PDF), quota/credits
+3. **Storage**: Saved to `contracts-temp/{user-id}/{fileId}.pdf`
+4. **Analysis**: Document parsed and analyzed
+5. **Cleanup**: File automatically deleted after analysis
+
+#### Mock Mode (Local Development)
+
+For local development without Supabase:
+
+```bash
+# .env.local
+MOCK_STORAGE=true
+```
+
+Files will be saved to `./temp/uploads/` instead of Supabase Storage.
+
+#### File Naming Convention
+
+```
+contracts-temp/
+  ├── user-{userId}/
+  │   └── {cuid}-{timestamp}.pdf
+  └── guest-{guestId}/
+      └── {cuid}-{timestamp}.pdf
+```
+
+Example: `user-abc123/cm4x5y6z7-1699123456789.pdf`
+
+**Benefits**:
+
+- User isolation (easy cleanup per user)
+- Unique filenames (CUID prevents collisions)
+- Timestamped (traceable uploads)
+
+#### Security Measures
+
+- ✅ **Private bucket** - No public URLs
+- ✅ **RLS policies** - Service role only
+- ✅ **Server-side upload** - Client never gets service role key
+- ✅ **MIME validation** - PDF only
+- ✅ **Size validation** - 10 MB maximum
+- ✅ **Rate limiting** - 5 uploads/min/IP
+- ✅ **Temporary storage** - Auto-delete after analysis
+- ✅ **Quota/credit check** - Before accepting upload
+
 ### Testing
 
 ```bash

@@ -57,6 +57,11 @@ const serverSchema = z.object({
   // Rate Limiting
   RATE_LIMIT_WINDOW: z.coerce.number().int().positive().default(60), // seconds
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10), // requests
+
+  // File Upload
+  UPLOAD_MAX_SIZE_MB: z.coerce.number().int().positive().default(10), // MB
+  UPLOAD_ALLOWED_MIME_TYPES: z.string().default("application/pdf"), // comma-separated
+  MOCK_STORAGE: z.enum(["true", "false"]).default("false"), // boolean flag
 });
 
 // =============================================================================
