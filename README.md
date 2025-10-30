@@ -118,6 +118,131 @@ pnpm typecheck
 
 **Pre-commit hooks**: Husky + lint-staged automatically run lint and format on staged files before each commit.
 
+### Authentication
+
+TrustDoc uses **NextAuth v5** with database sessions (Prisma + Supabase PostgreSQL).
+
+#### Server Components (RSC)
+
+Use server-side helpers for authentication in React Server Components:
+
+```tsx
+// Read session (returns null if not authenticated)
+import { getSession } from "@/src/auth/session";
+
+export default async function MyPage() {
+  const session = await getSession();
+  if (!session) return <p>Please sign in</p>;
+  return <p>Welcome {session.user.email}</p>;
+}
+
+// Require session (redirects if not authenticated)
+import { requireSession } from "@/src/auth/session";
+
+export default async function ProtectedPage() {
+  const session = await requireSession({
+    callbackUrl: "/dashboard", // Return here after sign-in
+  });
+  return <p>Protected content</p>;
+}
+
+// Get current user from database
+import { getCurrentUser } from "@/src/auth/current-user";
+
+export default async function ProfilePage() {
+  const user = await getCurrentUser();
+  if (!user) return <p>Please sign in</p>;
+  return <p>Credits: {user.credits}</p>;
+}
+
+// Require current user (throws UnauthorizedError if not authenticated)
+import { requireCurrentUser } from "@/src/auth/current-user";
+
+export default async function DashboardPage() {
+  const user = await requireCurrentUser();
+  return (
+    <p>
+      Welcome {user.name}, you have {user.credits} credits
+    </p>
+  );
+}
+```
+
+#### Client Components
+
+Use client-side hooks for authentication in Client Components:
+
+```tsx
+"use client";
+import { useSessionClient } from "@/src/auth/use-session";
+
+export function MyComponent() {
+  const { data: session, status } = useSessionClient();
+
+  if (status === "loading") return <p>Loading...</p>;
+  if (status === "unauthenticated") return <p>Please sign in</p>;
+
+  return <p>Welcome {session.user.email}</p>;
+}
+
+// Require authentication (auto-redirect if not authenticated)
+("use client");
+import { useRequireAuth } from "@/src/auth/use-require-auth";
+
+export function ProtectedComponent() {
+  const { session, loading } = useRequireAuth();
+
+  if (loading) return <p>Loading...</p>;
+
+  return <p>Protected content for {session.user.email}</p>;
+}
+
+// Use AuthGate component for conditional rendering
+import { AuthGate } from "@/components/auth/auth-gate";
+
+export function MyComponent() {
+  return (
+    <AuthGate>
+      <ProtectedContent />
+    </AuthGate>
+  );
+}
+
+// Display credits badge
+import { CreditsBadge } from "@/components/auth/credits-badge";
+
+export function Navbar() {
+  return (
+    <nav>
+      <CreditsBadge />
+    </nav>
+  );
+}
+```
+
+#### Callback URL Pattern
+
+After successful authentication, users are redirected back to the page they came from:
+
+```tsx
+// Link to sign-in with callback URL
+<Link href="/auth/signin?callbackUrl=/dashboard">Sign in</Link>;
+
+// Server-side redirect with callback
+import { requireSession } from "@/src/auth/session";
+
+const session = await requireSession({
+  callbackUrl: "/dashboard",
+});
+
+// Client-side redirect with callback (automatic in useRequireAuth)
+const { session } = useRequireAuth({
+  preserveCallbackUrl: true, // default: true
+});
+```
+
+📚 **Full documentation**: [docs/NEXTAUTH_SETUP.md](docs/NEXTAUTH_SETUP.md)
+
 ### Testing
 
 ```bash

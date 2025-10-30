@@ -4,17 +4,11 @@
  * Protected page that shows user info and credits after successful authentication.
  */
 
-import { redirect } from "next/navigation";
-
-import { requireAuth } from "@/src/lib/auth-helpers";
+import { requireCurrentUser } from "@/src/auth/current-user";
 
 export default async function DashboardPage() {
-  // Require authentication
-  const session = await requireAuth();
-
-  if (!session?.user) {
-    redirect("/auth/signin");
-  }
+  // Require authentication - will throw UnauthorizedError if not authenticated
+  const user = await requireCurrentUser();
 
   return (
     <div className="mx-auto max-w-4xl py-12">
@@ -26,17 +20,23 @@ export default async function DashboardPage() {
           <div className="rounded-lg bg-muted p-6">
             <h2 className="mb-4 text-xl font-semibold">Informations utilisateur</h2>
             <dl className="space-y-2">
+              {user.name && (
+                <div className="flex justify-between">
+                  <dt className="font-medium text-muted-foreground">Nom:</dt>
+                  <dd>{user.name}</dd>
+                </div>
+              )}
               <div className="flex justify-between">
                 <dt className="font-medium text-muted-foreground">Email:</dt>
-                <dd className="font-mono">{session.user.email}</dd>
+                <dd className="font-mono">{user.email}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="font-medium text-muted-foreground">ID:</dt>
-                <dd className="font-mono text-sm">{session.user.id}</dd>
+                <dd className="font-mono text-sm">{user.id}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="font-medium text-muted-foreground">Crédits:</dt>
-                <dd className="text-2xl font-bold text-primary">{session.user.credits}</dd>
+                <dd className="text-2xl font-bold text-primary">{user.credits}</dd>
               </div>
             </dl>
           </div>
@@ -49,8 +49,8 @@ export default async function DashboardPage() {
             <p className="text-green-800 dark:text-green-200">
               Vous êtes maintenant connecté avec NextAuth + Google OAuth.
               <br />
-              Vous avez <strong>{session.user.credits} crédits</strong> disponibles pour analyser
-              des documents.
+              Vous avez <strong>{user.credits} crédits</strong> disponibles pour analyser des
+              documents.
             </p>
           </div>
 

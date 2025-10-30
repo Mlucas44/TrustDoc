@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CreditsBadge } from "@/components/auth/credits-badge";
 import { AuthButton } from "@/components/auth-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -26,7 +27,8 @@ export function Navbar() {
             </Link>
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <CreditsBadge />
           <ThemeToggle />
           <AuthButton />
         </div>
