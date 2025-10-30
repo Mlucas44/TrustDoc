@@ -216,6 +216,49 @@ export async function uploadFile(
 }
 
 /**
+ * Download file from storage as Buffer
+ *
+ * @param filePath - Full path to file (e.g., "user-abc123/cm4x5y6z7-1699123456789.pdf")
+ * @returns File buffer
+ *
+ * @example
+ * ```ts
+ * const buffer = await downloadFile(result.path);
+ * ```
+ */
+export async function downloadFile(filePath: string): Promise<Buffer> {
+  if (MOCK_STORAGE) {
+    // Mock mode: read from local filesystem
+    const fullPath = path.join(MOCK_STORAGE_DIR, filePath);
+    try {
+      const buffer = await fs.readFile(fullPath);
+      return buffer;
+    } catch (error) {
+      console.error(`[MOCK_STORAGE] Failed to read file ${fullPath}:`, error);
+      throw new StorageUploadError(`File not found: ${filePath}`, error);
+    }
+  }
+
+  // Production mode: download from Supabase
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase.storage.from(BUCKET_NAME).download(filePath);
+
+  if (error) {
+    console.error("[downloadFile] Supabase download error:", error);
+    throw new StorageUploadError(`Failed to download file: ${error.message}`, error);
+  }
+
+  if (!data) {
+    throw new StorageUploadError(`File not found: ${filePath}`);
+  }
+
+  // Convert Blob to Buffer
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
  * Delete file from storage
  *
  * @param filePath - Full path to file (e.g., "user-abc123/cm4x5y6z7-1699123456789.pdf")

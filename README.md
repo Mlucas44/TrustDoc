@@ -652,6 +652,147 @@ Example: `user-abc123/cm4x5y6z7-1699123456789.pdf`
 - ✅ **Temporary storage** - Auto-delete after analysis
 - ✅ **Quota/credit check** - Before accepting upload
 
+### PDF Text Extraction (Multi-Page)
+
+TrustDoc extracts text from uploaded PDFs with multi-page support and metadata extraction.
+
+#### Key Features
+
+- **Multi-page support**: Extracts text from all pages with separators
+- **Page separators**: `--- PAGE {n} ---` for clause extraction
+- **Metadata extraction**: Title, author, producer, creator, creation date
+- **Scanned PDF detection**: Rejects PDFs with no extractable text
+- **Timeout protection**: 20-second limit for parsing
+- **Size validation**: Maximum 10 MB (enforced at upload and parse)
+
+#### API Endpoint
+
+```typescript
+POST /api/parse
+Content-Type: application/json
+
+// Request body
+{
+  filePath: "user-abc123/cm4x5y6z7-1699123456789.pdf"
+}
+
+// Success (200)
+{
+  pages: 15,
+  textLength: 12543,
+  textRaw: "Page 1 content...\n\n--- PAGE 2 ---\n\nPage 2 content...",
+  meta: {
+    title: "Contract Agreement",
+    author: "John Doe",
+    producer: "Adobe PDF Library",
+    creator: "Microsoft Word",
+    creationDate: "D:20240101120000Z"
+  }
+}
+
+// Errors
+400 Bad Request - Missing or invalid filePath
+401 Unauthorized - Not authenticated
+402 Payment Required - Insufficient credits or quota exceeded
+404 Not Found - File not found in storage (FILE_NOT_FOUND)
+413 Payload Too Large - PDF exceeds 10 MB (PDF_TOO_LARGE)
+422 Unprocessable Entity - Scanned PDF with no text (PDF_TEXT_EMPTY_OR_SCANNED)
+500 Internal Server Error - Parse failed (PARSE_FAILED)
+504 Gateway Timeout - Parsing took >20s (PARSE_TIMEOUT)
+```
+
+#### Usage Flow
+
+```typescript
+// 1. Upload PDF
+const uploadResponse = await fetch("/api/upload", {
+  method: "POST",
+  body: formData,
+});
+const { filePath } = await uploadResponse.json();
+
+// 2. Parse PDF
+const parseResponse = await fetch("/api/parse", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ filePath }),
+});
+const { pages, textLength, textRaw, meta } = await parseResponse.json();
+
+// 3. Proceed to analysis with extracted text
+console.log(`Extracted ${textLength} characters from ${pages} pages`);
+```
+
+#### Page Separators
+
+Text is extracted with page separators for clause identification:
+
+```
+Contract content from page 1...
+
+--- PAGE 2 ---
+
+Contract content from page 2...
+
+--- PAGE 3 ---
+
+Contract content from page 3...
+```
+
+This allows the AI to reference specific pages when identifying clauses.
+
+#### Scanned PDF Detection
+
+PDFs are validated for text content:
+
+- **Minimum text length**: 50 characters
+- **Minimum alphanumeric**: 50 characters
+- **Rejection**: Returns 422 with `PDF_TEXT_EMPTY_OR_SCANNED`
+
+**OCR is NOT supported**. Users must provide text-based PDFs.
+
+#### Timeout Protection
+
+Parsing has a 20-second timeout to prevent worker blocking:
+
+- Large PDFs (>10 MB) are rejected at upload
+- Complex PDFs may timeout → user should simplify
+- Timeout returns 504 with `PARSE_TIMEOUT`
+
+#### Security Measures
+
+- ✅ **Path validation** - Prevents path traversal attacks
+- ✅ **Format validation** - Only `{user|guest}-{id}/{fileId}.pdf`
+- ✅ **Size validation** - 10 MB maximum (re-checked at parse)
+- ✅ **Timeout protection** - 20-second limit
+- ✅ **No binary exposure** - Binary never returned to client
+- ✅ **Dev-only logging** - File IDs logged, not content
+
+#### Error Handling
+
+```typescript
+try {
+  const response = await fetch("/api/parse", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filePath }),
+  });
+
+  if (response.status === 422) {
+    // Scanned PDF - ask user for text-based version
+    alert("Please provide a text-based PDF (OCR not supported)");
+  } else if (response.status === 413) {
+    // File too large
+    alert("PDF exceeds 10 MB limit");
+  } else if (response.status === 504) {
+    // Parsing timeout
+    alert("PDF is too complex. Please simplify or use a smaller file.");
+  }
+} catch (error) {
+  console.error("Parse failed:", error);
+}
+```
+
 ### Testing
 
 ```bash
