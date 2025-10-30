@@ -326,6 +326,182 @@ import { GuestQuotaExceededDialog } from "@/components/guest/guest-quota-exceede
 - ✅ **Cookie cleared**: New guestId created, quota resets
 - ⏰ **30 days later**: Quota automatically resets
 
+### Credit Management (Authenticated Users)
+
+TrustDoc uses a **credit-based system** for authenticated users. Each analysis consumes 1 credit.
+
+#### Credit Operations
+
+**User Repository** (`src/db/user.repo.ts`):
+
+```typescript
+import { UserRepo, InsufficientCreditsError } from "@/src/db/user.repo";
+
+// Get user's credit balance
+const credits = await UserRepo.getCredits(userId);
+
+// Consume credits transactionally (atomic operation)
+const { remaining } = await UserRepo.consumeCredits(userId, 1);
+
+// Set credits (admin operation)
+await UserRepo.setCredits(userId, 10);
+```
+
+**Credits Service** (`src/services/credits.ts`):
+
+```typescript
+import { requireCredits, consumeOnSuccess } from "@/src/services/credits";
+
+// Validate sufficient credits
+await requireCredits(userId, 1);
+
+// Execute operation and consume credits only on success
+const result = await consumeOnSuccess(
+  userId,
+  async () => {
+    // Perform document analysis
+    return await analyzeDocument(fileBuffer);
+  },
+  1 // credits to consume
+);
+```
+
+#### Credit Flow (Recommended Pattern)
+
+1. **Verify credits** - Check user has sufficient credits
+2. **Execute operation** - Perform the analysis/task
+3. **Consume credits** - Deduct credits only if operation succeeds
+
+```typescript
+// Example: Analysis endpoint
+import { ensureHasCredits } from "@/src/middleware/credits-guard";
+import { UserRepo } from "@/src/db/user.repo";
+
+export async function POST(request: Request) {
+  // 1. Check credits
+  const creditsCheck = await ensureHasCredits(1);
+  if (!creditsCheck.allowed) {
+    return NextResponse.json(
+      { error: creditsCheck.error, code: creditsCheck.errorCode },
+      { status: creditsCheck.errorCode === "UNAUTHENTICATED" ? 401 : 402 }
+    );
+  }
+
+  try {
+    // 2. Execute operation
+    const result = await analyzeDocument(fileBuffer);
+
+    // 3. Consume credits (only on success)
+    await UserRepo.consumeCredits(creditsCheck.userId!, 1);
+
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    // Credits NOT consumed on failure
+    return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
+  }
+}
+```
+
+#### API Endpoints
+
+```typescript
+// Get user's credit balance
+GET /api/credits
+→ { credits: 10, userId: "..." }
+// Requires authentication (401 if not authenticated)
+
+// Get user profile with credits
+GET /api/me
+→ { id, email, credits, name, image }
+```
+
+#### Middleware Guards
+
+```typescript
+// Check if user has sufficient credits
+import { ensureHasCredits } from "@/src/middleware/credits-guard";
+
+const result = await ensureHasCredits(1);
+if (!result.allowed) {
+  // Handle error (401 Unauthorized or 402 Insufficient Credits)
+}
+
+// Unified guard (checks user credits OR guest quota)
+import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
+
+const quotaCheck = await requireQuotaOrUserCredit();
+if (!quotaCheck.allowed) {
+  // errorCode: "INSUFFICIENT_CREDITS" | "GUEST_QUOTA_EXCEEDED" | "USER_NOT_FOUND"
+}
+```
+
+#### Client-Side Components
+
+```tsx
+// Display user's credit balance (real-time with SWR)
+import { CreditsBadge } from "@/components/auth/credits-badge";
+
+<CreditsBadge refreshInterval={30000} />; // Refreshes every 30s
+
+// Show insufficient credits dialog
+import { InsufficientCreditsAlert } from "@/components/credits/insufficient-credits-alert";
+
+<InsufficientCreditsAlert
+  open={showAlert}
+  onOpenChange={setShowAlert}
+  currentCredits={0}
+  requiredCredits={1}
+/>;
+```
+
+#### Error Handling (402 Payment Required)
+
+When credits are insufficient, API returns **402 status code**:
+
+```typescript
+// Client-side error handling
+const response = await fetch("/api/analyze", {
+  method: "POST",
+  body: formData,
+});
+
+if (response.status === 402) {
+  const { error, code } = await response.json();
+  // code: "INSUFFICIENT_CREDITS"
+  // Show InsufficientCreditsAlert dialog
+  setShowInsufficientCreditsAlert(true);
+}
+```
+
+#### Transaction Safety
+
+All credit operations use **Prisma transactions** for atomicity:
+
+```typescript
+// UserRepo.consumeCredits implementation
+static async consumeCredits(userId: string, count = 1) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Read user (with row lock)
+    const user = await tx.user.findUnique({ where: { id: userId } });
+
+    // 2. Check sufficient credits
+    if (user.credits < count) {
+      throw new InsufficientCreditsError(userId, count, user.credits);
+    }
+
+    // 3. Decrement credits
+    const updated = await tx.user.update({
+      where: { id: userId },
+      data: { credits: { decrement: count } },
+    });
+
+    return { remaining: updated.credits };
+  });
+}
+```
+
+This ensures **race conditions are prevented** when multiple requests occur simultaneously.
+
 ### Testing
 
 ```bash
