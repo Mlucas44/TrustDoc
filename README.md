@@ -280,11 +280,12 @@ model GuestQuota {
 ```typescript
 // Initialize guest session
 POST /api/guest/init
-→ { guestId, used, remaining, limit }
+→ { guestId, used, remaining, limit, limitReached }
 
 // Get current quota status
 GET /api/guest/status
-→ { guestId, used, remaining, limit }
+→ { guestId, used, remaining, limit, limitReached }
+// limitReached: true when remaining === 0 (quota exhausted)
 ```
 
 #### Usage in Code

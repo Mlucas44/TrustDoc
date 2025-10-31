@@ -95,7 +95,7 @@ export async function initGuestQuota(guestId: string) {
  * Get current guest quota status
  *
  * @param guestId - Guest identifier
- * @returns Quota status { used, remaining, limit }
+ * @returns Quota status { used, remaining, limit, limitReached }
  */
 export async function getGuestQuotaStatus(guestId: string) {
   const quota = await prisma.guestQuota.findUnique({
@@ -109,6 +109,7 @@ export async function getGuestQuotaStatus(guestId: string) {
       used: newQuota.used,
       remaining: GUEST_QUOTA_LIMIT - newQuota.used,
       limit: GUEST_QUOTA_LIMIT,
+      limitReached: false,
       expired: false,
     };
   }
@@ -129,14 +130,18 @@ export async function getGuestQuotaStatus(guestId: string) {
       used: resetQuota.used,
       remaining: GUEST_QUOTA_LIMIT,
       limit: GUEST_QUOTA_LIMIT,
+      limitReached: false,
       expired: true,
     };
   }
 
+  const remaining = Math.max(0, GUEST_QUOTA_LIMIT - quota.used);
+
   return {
     used: quota.used,
-    remaining: Math.max(0, GUEST_QUOTA_LIMIT - quota.used),
+    remaining,
     limit: GUEST_QUOTA_LIMIT,
+    limitReached: remaining === 0,
     expired: false,
   };
 }
