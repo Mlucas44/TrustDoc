@@ -502,6 +502,133 @@ static async consumeCredits(userId: string, count = 1) {
 
 This ensures **race conditions are prevented** when multiple requests occur simultaneously.
 
+#### Credits Guard (Blocking Expensive Operations)
+
+TrustDoc uses **guard middleware** to block expensive operations (LLM calls, PDF parsing) when users have insufficient credits. The guard executes **early in the request lifecycle** to minimize wasted resources.
+
+**How it works:**
+
+1. **Early Check** - Guard runs BEFORE expensive operations
+2. **Fast Rejection** - Returns 402 immediately if credits insufficient
+3. **Telemetry** - Logs all refusals with userId, route, duration
+4. **Guest Support** - Automatically handles guest quota OR user credits
+
+**Guard Order of Execution:**
+
+```typescript
+// In protected API routes:
+export async function POST(request: NextRequest) {
+  // 1. FIRST: Check quota/credits (fast, ~10ms)
+  const quotaCheck = await requireQuotaOrUserCredit("/api/analyze");
+
+  if (!quotaCheck.allowed) {
+    // Return 402 immediately - NO expensive operations executed
+    return NextResponse.json(
+      { error: quotaCheck.error, code: quotaCheck.errorCode },
+      { status: 402 }
+    );
+  }
+
+  // 2. THEN: Proceed with expensive operations (LLM, parsing, etc.)
+  const analysis = await analyzeContract(...);
+
+  // 3. FINALLY: Consume credits after success
+  await UserRepo.consumeCredits(userId, 1);
+}
+```
+
+**Protected Endpoints:**
+
+- `POST /api/upload` - File upload validation
+- `POST /api/parse` - PDF text extraction
+- `POST /api/prepare` - Text normalization
+- `POST /api/analyze` - LLM contract analysis
+
+**Error Response Format:**
+
+When credits are insufficient, API returns 402 with standardized payload:
+
+```json
+{
+  "error": "Insufficient credits. You have 0 credits, but 1 is required.",
+  "code": "INSUFFICIENT_CREDITS"
+}
+```
+
+For guests:
+
+```json
+{
+  "error": "Guest quota exceeded (3/3). Please sign in to continue.",
+  "code": "GUEST_QUOTA_EXCEEDED"
+}
+```
+
+**Client-Side Handling:**
+
+```typescript
+// Client code example
+const response = await fetch("/api/analyze", {
+  method: "POST",
+  body: JSON.stringify({ textClean, contractType }),
+});
+
+if (response.status === 402) {
+  const { code } = await response.json();
+
+  if (code === "INSUFFICIENT_CREDITS") {
+    // Show "Buy Credits" dialog
+    showInsufficientCreditsDialog();
+  } else if (code === "GUEST_QUOTA_EXCEEDED") {
+    // Show "Sign In" dialog
+    showSignInDialog();
+  }
+}
+```
+
+**Centralized Error Handling:**
+
+Use `toJsonError()` utility for consistent error responses:
+
+```typescript
+import { toJsonError } from "@/src/middleware/httpErrors";
+
+try {
+  await analyzeContract(...);
+} catch (error) {
+  // Automatically maps to correct status code:
+  // - InsufficientCreditsError → 402
+  // - GuestQuotaExceededError → 402
+  // - LLMRateLimitError → 429
+  // - LLMTransientError → 503
+  // - AnalysisInvalidError → 422
+  return toJsonError(error);
+}
+```
+
+**Telemetry & Logging:**
+
+All credit guard refusals are logged with telemetry data:
+
+```typescript
+// Example log output (development)
+[requireQuotaOrUserCredit] Insufficient credits (402) {
+  userId: "clx...",
+  credits: 0,
+  route: "/api/analyze",
+  duration: "8.42ms",
+  timestamp: "2025-01-15T10:30:00.000Z"
+}
+```
+
+**Benefits:**
+
+- ✅ **Cost Savings** - No LLM calls wasted on insufficient credits
+- ✅ **Fast Response** - Guard executes in ~10ms (no DB queries for guest mode)
+- ✅ **Better UX** - Clear error messages with upgrade path
+- ✅ **Observable** - All refusals logged with context
+- ✅ **Consistent** - Centralized error mapping across all routes
+
 ### File Upload (Secure PDF Storage)
 
 TrustDoc provides secure, temporary file upload to Supabase Storage for PDF contract analysis.

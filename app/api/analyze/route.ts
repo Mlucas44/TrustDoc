@@ -41,7 +41,7 @@ export const maxDuration = 60; // 60 seconds for LLM analysis
 export async function POST(request: NextRequest) {
   try {
     // 1. Check quota/credits
-    const quotaCheck = await requireQuotaOrUserCredit();
+    const quotaCheck = await requireQuotaOrUserCredit("/api/analyze");
 
     if (!quotaCheck.allowed) {
       const status =

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Check quota/credits BEFORE accepting file upload
-    const quotaCheck = await requireQuotaOrUserCredit();
+    const quotaCheck = await requireQuotaOrUserCredit("/api/upload");
 
     if (!quotaCheck.allowed) {
       // Determine status code based on error

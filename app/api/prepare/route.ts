@@ -51,7 +51,7 @@ function validateFilePath(filePath: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     // 1. Check quota/credits
-    const quotaCheck = await requireQuotaOrUserCredit();
+    const quotaCheck = await requireQuotaOrUserCredit("/api/prepare");
 
     if (!quotaCheck.allowed) {
       const status =

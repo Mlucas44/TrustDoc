@@ -20,6 +20,7 @@ export interface QuotaCheckResult {
   isGuest: boolean;
   userId?: string;
   guestId?: string;
+  credits?: number;
   error?: string;
   errorCode?: string;
 }
@@ -31,11 +32,12 @@ export interface QuotaCheckResult {
  * 1. If authenticated user → check credits (handled by credit system)
  * 2. If guest → check guest quota (max 3 analyses)
  *
+ * @param route - Optional route name for telemetry logging
  * @returns QuotaCheckResult with allowed status and user/guest info
  *
  * @example
  * ```ts
- * const result = await requireQuotaOrUserCredit();
+ * const result = await requireQuotaOrUserCredit("/api/analyze");
  * if (!result.allowed) {
  *   return NextResponse.json(
  *     { error: result.error, code: result.errorCode },
@@ -44,13 +46,21 @@ export interface QuotaCheckResult {
  * }
  * ```
  */
-export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
+export async function requireQuotaOrUserCredit(route?: string): Promise<QuotaCheckResult> {
+  const startTime = performance.now();
   const session = await getSession();
 
   if (session?.user?.id) {
     const user = await getCurrentUser();
 
     if (!user) {
+      const duration = performance.now() - startTime;
+      console.warn(`[requireQuotaOrUserCredit] User not found`, {
+        userId: session.user.id,
+        route,
+        duration: `${duration.toFixed(2)}ms`,
+      });
+
       return {
         allowed: false,
         isGuest: false,
@@ -60,6 +70,17 @@ export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
     }
 
     if (user.credits <= 0) {
+      const duration = performance.now() - startTime;
+
+      // Telemetry: Log 402 refusal for authenticated users
+      console.warn(`[requireQuotaOrUserCredit] Insufficient credits (402)`, {
+        userId: user.id,
+        credits: user.credits,
+        route: route || "unknown",
+        duration: `${duration.toFixed(2)}ms`,
+        timestamp: new Date().toISOString(),
+      });
+
       return {
         allowed: false,
         isGuest: false,
@@ -69,10 +90,21 @@ export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
       };
     }
 
+    const duration = performance.now() - startTime;
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[requireQuotaOrUserCredit] Quota check passed`, {
+        userId: user.id,
+        credits: user.credits,
+        route: route || "unknown",
+        duration: `${duration.toFixed(2)}ms`,
+      });
+    }
+
     return {
       allowed: true,
       isGuest: false,
       userId: user.id,
+      credits: user.credits,
     };
   }
 
@@ -80,13 +112,31 @@ export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
     const guestId = await getOrCreateGuestId();
     await checkGuestQuota(guestId);
 
+    const duration = performance.now() - startTime;
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[requireQuotaOrUserCredit] Guest quota check passed`, {
+        guestId,
+        route: route || "unknown",
+        duration: `${duration.toFixed(2)}ms`,
+      });
+    }
+
     return {
       allowed: true,
       isGuest: true,
       guestId,
     };
   } catch (error) {
+    const duration = performance.now() - startTime;
+
     if (error instanceof GuestQuotaExceededError) {
+      // Telemetry: Log 402 refusal for guests
+      console.warn(`[requireQuotaOrUserCredit] Guest quota exceeded (402)`, {
+        route: route || "unknown",
+        duration: `${duration.toFixed(2)}ms`,
+        timestamp: new Date().toISOString(),
+      });
+
       return {
         allowed: false,
         isGuest: true,
@@ -96,7 +146,11 @@ export async function requireQuotaOrUserCredit(): Promise<QuotaCheckResult> {
     }
 
     // Unknown error
-    console.error("[requireQuotaOrUserCredit] Error:", error);
+    console.error("[requireQuotaOrUserCredit] Error:", error, {
+      route: route || "unknown",
+      duration: `${duration.toFixed(2)}ms`,
+    });
+
     return {
       allowed: false,
       isGuest: true,
