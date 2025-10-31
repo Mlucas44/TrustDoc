@@ -13,7 +13,12 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { AnalysisInvalidError } from "@/src/schemas/analysis";
 import { ContractTypeEnum } from "@/src/schemas/detect";
-import { callAnalysisLLM } from "@/src/services/llm/analyze";
+import { analyzeContract } from "@/src/services/llm/analysis.service";
+import {
+  LLMRateLimitError,
+  LLMTransientError,
+  LLMUnavailableError,
+} from "@/src/services/llm/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60 seconds for LLM analysis
@@ -134,8 +139,52 @@ export async function POST(request: NextRequest) {
     // 5. Call LLM analysis
     let analysis;
     try {
-      analysis = await callAnalysisLLM(textClean, contractTypeValidation.data);
+      analysis = await analyzeContract({
+        textClean,
+        contractType: contractTypeValidation.data,
+        // modelHint can be added here if needed (e.g., from query params)
+      });
     } catch (error) {
+      // Handle rate limit errors (429)
+      if (error instanceof LLMRateLimitError) {
+        console.error("[POST /api/analyze] LLM rate limit exceeded:", error);
+        return NextResponse.json(
+          {
+            error: `Rate limit exceeded for ${error.provider}. Please try again later.`,
+            code: "RATE_LIMIT_EXCEEDED",
+            provider: error.provider,
+            retryAfter: error.retryAfter,
+          },
+          { status: 429 }
+        );
+      }
+
+      // Handle transient errors (5xx from provider)
+      if (error instanceof LLMTransientError) {
+        console.error("[POST /api/analyze] LLM transient error:", error);
+        return NextResponse.json(
+          {
+            error: `Temporary error from ${error.provider}. Please try again.`,
+            code: "LLM_TRANSIENT_ERROR",
+            provider: error.provider,
+          },
+          { status: 503 }
+        );
+      }
+
+      // Handle provider unavailable errors
+      if (error instanceof LLMUnavailableError) {
+        console.error("[POST /api/analyze] LLM provider unavailable:", error);
+        return NextResponse.json(
+          {
+            error: `LLM provider ${error.provider} is unavailable. Please try again later.`,
+            code: "LLM_UNAVAILABLE",
+            provider: error.provider,
+          },
+          { status: 503 }
+        );
+      }
+
       // Handle invalid LLM output (after retries)
       if (error instanceof AnalysisInvalidError) {
         console.error("[POST /api/analyze] LLM output invalid after retries:", error);

@@ -48,7 +48,9 @@ const serverSchema = z.object({
 
   // LLM / AI
   OPENAI_API_KEY: z.string().min(1, "OpenAI API key is required"),
-  OLLAMA_BASE_URL: z.string().url().optional(), // Optional for local LLM
+  OPENAI_MODEL: z.string().optional(), // Optional, defaults to gpt-4o-mini
+  OLLAMA_BASE_URL: z.string().url().optional(), // Optional for local LLM, defaults to http://localhost:11434/v1
+  OLLAMA_MODEL: z.string().optional(), // Optional, defaults to mistral
 
   // Stripe
   STRIPE_SECRET_KEY: z.string().startsWith("sk_", "Invalid Stripe secret key format"),
