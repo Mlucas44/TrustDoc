@@ -629,6 +629,142 @@ All credit guard refusals are logged with telemetry data:
 - ✅ **Observable** - All refusals logged with context
 - ✅ **Consistent** - Centralized error mapping across all routes
 
+#### Credit Consumption (Analysis Pipeline)
+
+TrustDoc ensures credits are charged **exactly once per successful analysis** with idempotency protection.
+
+**Pipeline Order:**
+
+```typescript
+// 1. Guard checks credits BEFORE expensive operations
+const quotaCheck = await requireQuotaOrUserCredit("/api/analyze");
+if (!quotaCheck.allowed) return 402;
+
+// 2. Run analysis pipeline (LLM → Persist → Debit)
+const result = await runAnalysis({
+  userId,
+  isGuest,
+  textClean,
+  contractType,
+  filename,
+  idempotencyKey, // Client-provided for replay protection
+});
+
+// 3. Credits consumed ONLY if analysis succeeds
+// Transaction: INSERT Analysis + UPDATE User.credits -= 1
+```
+
+**Atomic Transaction:**
+
+All credit operations use **Prisma transactions** for atomicity:
+
+```typescript
+await prisma.$transaction(async (tx) => {
+  // 1. Verify credits (with row lock)
+  const user = await tx.user.findUnique({ where: { id: userId } });
+  if (user.credits < 1) throw new Error("Insufficient credits");
+
+  // 2. Create analysis
+  const analysis = await tx.analysis.create({ data: {...} });
+
+  // 3. Consume credit (decrement by 1)
+  await tx.user.update({
+    where: { id: userId },
+    data: { credits: { decrement: 1 } },
+  });
+
+  // All or nothing - if any step fails, entire transaction rolls back
+});
+```
+
+**Idempotency Protection:**
+
+Prevents duplicate charges on retries/refreshes:
+
+```typescript
+// Client sends idempotency key
+const response = await fetch("/api/analyze", {
+  method: "POST",
+  body: JSON.stringify({
+    textClean,
+    contractType,
+    idempotencyKey: `analysis_${fileId}_${timestamp}`, // Stable key per upload
+  }),
+});
+
+const data = await response.json();
+
+if (data.isReplay) {
+  // Request was duplicate - no credit charged
+  console.log("Using cached result from previous analysis");
+} else {
+  // New analysis - 1 credit charged
+  console.log(`Credits remaining: ${data.creditsRemaining}`);
+}
+```
+
+**When Credits Are Consumed:**
+
+| Scenario                                 | Credit Charged?   | Reason                                     |
+| ---------------------------------------- | ----------------- | ------------------------------------------ |
+| Analysis succeeds                        | ✅ Yes (1 credit) | Transaction commits after analysis + debit |
+| Parse error (PDF invalid)                | ❌ No             | Error before LLM call                      |
+| LLM timeout/error                        | ❌ No             | Transaction not started                    |
+| Validation error (output invalid)        | ❌ No             | Transaction rolled back                    |
+| Duplicate request (same idempotency key) | ❌ No             | Replay detected, cached result returned    |
+| User refreshes page                      | ❌ No             | Same idempotency key = replay              |
+
+**Preventing Over-Debits:**
+
+1. **Pre-check**: Guard verifies credits > 0 before starting
+2. **Transaction check**: Re-verify credits inside transaction (race condition protection)
+3. **Atomic decrement**: `credits: { decrement: 1 }` prevents negative balance
+4. **Idempotency**: Duplicate requests don't charge (24-hour key expiration)
+5. **No retry charging**: Failed analyses never consume credits
+
+**Telemetry:**
+
+Credit consumption is fully logged:
+
+```typescript
+// Example log output
+[persistAndConsumeCredits] Analysis clx_abc123 created {
+  userId: "clx_user789",
+  debit: 1,
+  remaining: 9
+}
+
+[runAnalysis] Analysis pipeline completed successfully in 3420.52ms {
+  analysisId: "clx_abc123",
+  isReplay: false,
+  creditsRemaining: 9
+}
+
+// Replay detected
+[withIdempotency] Replay detected for key idem_xyz, status: SUCCEEDED
+[runAnalysis] Idempotency replay for key idem_xyz {
+  status: "SUCCEEDED",
+  resultId: "clx_abc123"
+}
+```
+
+**Setup:**
+
+⚠️ **Requires database migration** - See [IDEMPOTENCY_SETUP.md](IDEMPOTENCY_SETUP.md) for activation steps.
+
+Current implementation includes:
+
+- ✅ Prisma schema (Idempotency model)
+- ✅ Service with mutex + DB locking
+- ✅ Pipeline orchestration (LLM → Persist → Debit)
+- ✅ Full documentation
+
+After migration:
+
+1. Run `pnpm db:migrate "add_idempotency_model"`
+2. Update `/api/analyze` to use `runAnalysis()` pipeline
+3. Client sends `idempotencyKey` with each request
+
 ### File Upload (Secure PDF Storage)
 
 TrustDoc provides secure, temporary file upload to Supabase Storage for PDF contract analysis.

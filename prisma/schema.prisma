@@ -152,3 +152,36 @@ model GuestQuota {
   @@index([expiresAt])
   @@map("guest_quotas")
 }
+
+// =============================================================================
+// Idempotency Model
+// =============================================================================
+
+/// Idempotency status for request deduplication
+enum IdempotencyStatus {
+  PENDING   // Request is being processed
+  SUCCEEDED // Request completed successfully
+  FAILED    // Request failed permanently
+}
+
+/// Idempotency tracking for analysis requests
+/// Prevents duplicate credit charges on retries/refreshes
+model Idempotency {
+  key           String             @id // Client-provided idempotency key
+  status        IdempotencyStatus  @default(PENDING)
+  fingerprint   String             // Request fingerprint (hash of input params)
+  resultId      String?            // Analysis ID if succeeded
+  errorCode     String?            // Error code if failed
+  errorMessage  String?            // Error message if failed
+  lockedAt      DateTime?          // When the lock was acquired
+  lockedUntil   DateTime?          // When the lock expires (for timeout)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  expiresAt     DateTime           // Key expiration (24 hours from creation)
+
+  @@index([key])
+  @@index([status])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("idempotency")
+}
