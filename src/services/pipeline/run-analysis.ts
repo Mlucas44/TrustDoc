@@ -13,7 +13,7 @@
 
 import "server-only";
 
-import { type ContractType } from "@prisma/client";
+import { Prisma, type ContractType } from "@prisma/client";
 
 import { AnalysisRepo, type CreateAnalysisInput } from "@/src/db/analysis.repo";
 import { prisma } from "@/src/lib/prisma";
@@ -317,9 +317,9 @@ async function persistAndConsumeCredits(params: {
         textLength: analysisInput.textLength,
         summary: analysisInput.summary,
         riskScore: analysisInput.riskScore,
-        redFlags: analysisInput.redFlags ?? null,
-        clauses: analysisInput.clauses ?? null,
-        aiResponse: analysisInput.aiResponse ?? null,
+        redFlags: analysisInput.redFlags ?? Prisma.JsonNull,
+        clauses: analysisInput.clauses ?? Prisma.JsonNull,
+        aiResponse: analysisInput.aiResponse ?? Prisma.JsonNull,
       },
       select: {
         id: true,

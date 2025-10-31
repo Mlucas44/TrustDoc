@@ -283,7 +283,7 @@ export async function withIdempotency<T = string>(
   if (existing) {
     // Key already processed - return cached result
     console.log(`[withIdempotency] Replay detected for key ${key}, status: ${existing.status}`);
-    return existing;
+    return existing as IdempotencyResult<T>;
   }
 
   // 2. Acquire in-memory mutex (prevent concurrent execution in same process)
@@ -296,7 +296,7 @@ export async function withIdempotency<T = string>(
     const retry = await checkIdempotency(key, fingerprint);
     if (retry) {
       console.log(`[withIdempotency] Mutex released, returning cached result for key ${key}`);
-      return retry;
+      return retry as IdempotencyResult<T>;
     }
   }
 
