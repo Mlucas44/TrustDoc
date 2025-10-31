@@ -1156,6 +1156,229 @@ console.log(`Contract type: ${contractType.type} (${contractType.confidence})`);
 - **Custom templates**: Non-standard contract structures may require manual review
 - **Confidence threshold**: Low confidence (< 0.5) results in "AUTRE" classification
 
+### Contract Analysis (LLM)
+
+TrustDoc analyzes contracts using LLM (OpenAI or local Ollama) with strict JSON schema validation to ensure structured, reliable output.
+
+#### Analysis Components
+
+**Summary** (5-8 bullet points):
+
+- Clear, concise key points about the contract
+- Focus on main obligations and rights
+- Simple, understandable language
+
+**Risk Score** (0-100):
+
+- 0-30: Low risk (fair, balanced contract)
+- 31-60: Medium risk (some unfavorable clauses)
+- 61-100: High risk (very unfavorable, potential traps)
+- Includes justification explaining the score
+
+**Red Flags** (0-N problematic clauses):
+
+- Title: Brief description
+- Severity: low | medium | high
+- Why: Explanation of the problem
+- Clause excerpt: Exact text from contract
+
+**Clauses** (key contract sections):
+
+- Extracted based on contract type
+- FREELANCE: Objet de la mission, Rémunération, Livrables, etc.
+- EMPLOI: Poste, Durée, Période d'essai, Rémunération, etc.
+- CGU: Objet du service, Données personnelles, Responsabilité, etc.
+- NDA: Définition confidentialité, Obligations, Durée, etc.
+
+#### API Endpoint
+
+```typescript
+POST /api/analyze
+Content-Type: application/json
+
+// Request
+{
+  textClean: "Normalized contract text...",
+  contractType: "FREELANCE"  // or CGU, EMPLOI, NDA, DEVIS, PARTENARIAT, AUTRE
+}
+
+// Success (200)
+{
+  "analysis": {
+    "summary": [
+      "Contrat de prestation de services entre freelance et client",
+      "Mission limitée à 3 mois renouvelable",
+      "Rémunération forfaitaire de 5000€ HT",
+      "Propriété intellectuelle transférée au client",
+      "Clause de confidentialité standard"
+    ],
+    "riskScore": 45,
+    "riskJustification": "Score modéré dû à une clause de résiliation unilatérale par le client sans préavis.",
+    "redFlags": [
+      {
+        "title": "Résiliation unilatérale sans préavis",
+        "severity": "medium",
+        "why": "Le client peut résilier à tout moment sans justification ni préavis.",
+        "clause_excerpt": "Le Client pourra résilier le présent contrat à tout moment..."
+      }
+    ],
+    "clauses": [
+      {
+        "type": "Objet de la mission",
+        "text": "Le Prestataire s'engage à réaliser pour le Client..."
+      },
+      {
+        "type": "Rémunération & facturation",
+        "text": "La rémunération est fixée à 5000€ HT..."
+      }
+    ]
+  }
+}
+
+// Errors
+400 Bad Request - Missing or invalid input
+401 Unauthorized - Not authenticated
+402 Payment Required - Insufficient credits or quota exceeded
+422 Unprocessable Entity - LLM output invalid after retries (ANALYSIS_INVALID_OUTPUT)
+500 Internal Server Error - LLM service error (ANALYSIS_FAILED)
+```
+
+#### JSON Schema Validation
+
+All LLM outputs are validated with Zod schemas:
+
+```typescript
+// AnalysisSchema
+{
+  summary: string[],           // 3-10 items, 10-500 chars each
+  riskScore: number,            // integer 0-100
+  riskJustification: string,    // 20-1000 chars
+  redFlags: RedFlag[],          // 0-N items
+  clauses: Clause[]             // contract-specific clauses
+}
+
+// RedFlagSchema
+{
+  title: string,                // 1-200 chars
+  severity: "low" | "medium" | "high",
+  why: string,                  // 10-1000 chars
+  clause_excerpt: string        // 10-500 chars
+}
+
+// ClauseSchema
+{
+  type: string,                 // 1-100 chars (e.g., "Durée & renouvellement")
+  text: string                  // 10-2000 chars
+}
+```
+
+#### Validation & Retry Logic
+
+1. **Initial LLM Call**: Request JSON output from GPT-4o-mini
+2. **Parse & Validate**: Parse JSON and validate with Zod schema
+3. **If Valid**: Return result immediately
+4. **If Invalid**: Retry with repair prompt (max 2 attempts)
+   - Send validation errors back to LLM
+   - Request corrected JSON output
+5. **After Max Retries**: Throw `AnalysisInvalidError` (422 status)
+
+This ensures:
+
+- ✅ Structured output (no free-form text)
+- ✅ Type-safe data for frontend
+- ✅ Reliable database storage
+- ✅ Reduced hallucinations
+
+#### Ollama Support (Local LLM)
+
+TrustDoc supports local LLM inference via Ollama:
+
+```bash
+# Set environment variables
+USE_OLLAMA=true
+OLLAMA_BASE_URL=http://localhost:11434/v1  # default
+
+# Recommended models
+ollama pull mistral
+ollama pull llama2
+```
+
+**Benefits**:
+
+- No API costs (runs locally)
+- Data privacy (contracts never leave your machine)
+- Offline capability
+
+**Trade-offs**:
+
+- Slower than OpenAI (depends on hardware)
+- May produce lower quality analysis
+- Requires GPU for good performance
+
+#### Usage Example
+
+```typescript
+// Complete pipeline: Upload → Parse → Normalize → Detect → Analyze
+const formData = new FormData();
+formData.append("file", pdfFile);
+
+// 1. Upload PDF
+const uploadResponse = await fetch("/api/upload", {
+  method: "POST",
+  body: formData,
+});
+const { filePath } = await uploadResponse.json();
+
+// 2. Prepare text (parse + normalize + detect type)
+const prepareResponse = await fetch("/api/prepare", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ filePath }),
+});
+const { textClean, contractType } = await prepareResponse.json();
+
+// 3. Analyze contract
+const analyzeResponse = await fetch("/api/analyze", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    textClean,
+    contractType: contractType.type,
+  }),
+});
+
+const { analysis } = await analyzeResponse.json();
+
+console.log(`Risk score: ${analysis.riskScore}/100`);
+console.log(`Red flags: ${analysis.redFlags.length}`);
+console.log(`Summary: ${analysis.summary.join(" • ")}`);
+```
+
+#### Limitations & Known Issues
+
+**Schema Enforcement**:
+
+- LLMs may occasionally produce invalid JSON despite prompts
+- Retry logic handles most cases (success rate ~95%)
+- Complex contracts may require 2-3 attempts
+
+**Hallucinations**:
+
+- LLMs may misinterpret ambiguous clauses
+- Red flags should be manually verified
+- Not a substitute for legal advice
+
+**Performance**:
+
+- OpenAI: ~2-5 seconds per analysis
+- Ollama (local): ~10-30 seconds (depends on hardware)
+- Large contracts (>50k chars) may take longer
+
+**Token Limits**:
+
+- Maximum 200k characters per analysis
+- Very long contracts are truncated by normalization pipeline
+
 ### Testing
 
 ```bash
