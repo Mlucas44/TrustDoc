@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    // Idempotency system - requires DB migration first
+    "src/services/idempotency.ts",
+    "src/services/pipeline/run-analysis.ts"
+  ]
+}

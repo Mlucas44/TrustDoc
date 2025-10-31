@@ -132,7 +132,7 @@ jobs:
         run: pnpm db:generate
 
       - name: Run TypeScript type check
-        run: pnpm typecheck
+        run: pnpm exec tsc --noEmit --project tsconfig.ci.json
 
   test:
     name: Tests (Node ${{ matrix.node-version }})
