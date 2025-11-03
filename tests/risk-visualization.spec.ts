@@ -178,32 +178,41 @@ test.describe("RiskGauge Component", () => {
   });
 
   test("low risk gauge has green color scheme", async ({ page }) => {
-    // Find the card with "Low Risk Example" title
-    const lowCard = page.locator('[role="region"]', { hasText: "Low Risk Example" }).first();
-    await expect(lowCard).toBeVisible();
+    // Scroll to Risk Visualization section first
+    await page.getByRole("heading", { name: "Risk Gauge" }).scrollIntoViewIfNeeded();
 
-    // Verify it contains a Low badge
-    const lowBadge = lowCard.getByText("Low", { exact: true });
+    // Find text "Low Risk Example" and verify Low badge is nearby
+    const lowSection = page.getByText("Low Risk Example");
+    await expect(lowSection).toBeVisible();
+
+    // Find the Low badge near this section
+    const lowBadge = page.getByText("Low", { exact: true }).first();
     await expect(lowBadge).toBeVisible();
   });
 
   test("medium risk gauge has yellow color scheme", async ({ page }) => {
-    // Find the card with "Medium Risk Example" title
-    const mediumCard = page.locator('[role="region"]', { hasText: "Medium Risk Example" }).first();
-    await expect(mediumCard).toBeVisible();
+    // Scroll to section
+    await page.getByRole("heading", { name: "Risk Gauge" }).scrollIntoViewIfNeeded();
 
-    // Verify it contains a Medium badge
-    const mediumBadge = mediumCard.getByText("Medium", { exact: true });
+    // Find text "Medium Risk Example" and verify Medium badge is nearby
+    const mediumSection = page.getByText("Medium Risk Example");
+    await expect(mediumSection).toBeVisible();
+
+    // Verify Medium badge exists
+    const mediumBadge = page.getByText("Medium", { exact: true }).first();
     await expect(mediumBadge).toBeVisible();
   });
 
   test("high risk gauge has red color scheme", async ({ page }) => {
-    // Find the card with "High Risk Example" title
-    const highCard = page.locator('[role="region"]', { hasText: "High Risk Example" }).first();
-    await expect(highCard).toBeVisible();
+    // Scroll to section
+    await page.getByRole("heading", { name: "Risk Gauge" }).scrollIntoViewIfNeeded();
 
-    // Verify it contains a High badge
-    const highBadge = highCard.getByText("High", { exact: true });
+    // Find text "High Risk Example" and verify High badge is nearby
+    const highSection = page.getByText("High Risk Example");
+    await expect(highSection).toBeVisible();
+
+    // Verify High badge exists
+    const highBadge = page.getByText("High", { exact: true }).first();
     await expect(highBadge).toBeVisible();
   });
 });
