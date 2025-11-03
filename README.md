@@ -2192,6 +2192,319 @@ pnpm test tests/red-flags.spec.ts
 
 ---
 
+## Key Clauses Table
+
+### Overview
+
+The Key Clauses Table provides a responsive UI for displaying and managing contract clauses extracted from documents. The system includes:
+
+- **Type-safe data structures** for clauses with automatic categorization
+- **ClausesTable component** with filtering, search, and sorting
+- **ClauseDetail dialog** for viewing full clause text
+- **Responsive design** (table on desktop, cards on mobile)
+- **13 predefined categories** with icons and color coding
+
+### Components
+
+#### ClausesTable
+
+Displays clauses in a filterable, searchable table with responsive design.
+
+**Props:**
+
+| Prop        | Type         | Default     | Description                 |
+| ----------- | ------------ | ----------- | --------------------------- |
+| `clauses`   | `UiClause[]` | Required    | Array of clauses to display |
+| `className` | `string`     | `undefined` | Additional CSS classes      |
+
+**Example:**
+
+```tsx
+import { ClausesTable } from "@/src/components/analysis/ClausesTable";
+import { toUiClauses } from "@/src/lib/clause-utils";
+
+// Convert API clauses to UI clauses
+const uiClauses = toUiClauses(analysis.clauses);
+
+<ClausesTable clauses={uiClauses} />;
+```
+
+**Features:**
+
+- Search by clause type or content (full-text)
+- Filter by category with visual badges
+- Sort by type (A-Z, Z-A) or length (ascending, descending)
+- Desktop: Full table with columns (Clause, Extrait, Actions)
+- Mobile: Stacked cards with "Voir plus" button
+- Copy actions (preview or full text)
+- Click to view full clause in dialog
+- Item count with live updates
+
+#### ClauseDetail
+
+Displays full clause text in a dialog.
+
+**Props:**
+
+| Prop           | Type                      | Default  | Description                       |
+| -------------- | ------------------------- | -------- | --------------------------------- |
+| `clause`       | `UiClause \| null`        | Required | Clause to display                 |
+| `open`         | `boolean`                 | Required | Whether dialog is open            |
+| `onOpenChange` | `(open: boolean) => void` | Required | Callback when dialog should close |
+
+**Example:**
+
+```tsx
+import { ClauseDetail } from "@/src/components/analysis/ClauseDetail";
+
+const [selectedClause, setSelectedClause] = useState<UiClause | null>(null);
+
+<ClauseDetail
+  clause={selectedClause}
+  open={!!selectedClause}
+  onOpenChange={(open) => !open && setSelectedClause(null)}
+/>;
+```
+
+**Features:**
+
+- Category badge with icon
+- Scrollable content area
+- Copy button with toast feedback
+- Close button and ESC key support
+- Preserves scroll position on close
+
+### Types
+
+```typescript
+// Clause categories
+export type ClauseCategory =
+  | "parties"
+  | "object"
+  | "duration"
+  | "termination"
+  | "payment"
+  | "liability"
+  | "ip"
+  | "confidentiality"
+  | "gdpr"
+  | "jurisdiction"
+  | "non_compete"
+  | "assignment"
+  | "other";
+
+// Base clause structure (from API)
+export interface Clause {
+  type: string; // Clause type/name
+  text: string; // Full clause text
+}
+
+// UI clause with generated fields
+export interface UiClause extends Clause {
+  id: string; // Generated with nanoid
+  category: ClauseCategory; // Normalized category
+  preview: string; // First 240-320 chars, clean cut
+}
+```
+
+### Categories
+
+The system automatically normalizes clause types to one of 13 categories:
+
+| Category          | Label                    | Icon        | Example Types                    |
+| ----------------- | ------------------------ | ----------- | -------------------------------- |
+| `parties`         | Parties                  | Users       | "Parties", "Les parties"         |
+| `object`          | Objet                    | Target      | "Objet du contrat", "Purpose"    |
+| `duration`        | Durée                    | Calendar    | "Durée", "Duration", "Terme"     |
+| `termination`     | Résiliation              | Clock       | "Résiliation", "Termination"     |
+| `payment`         | Paiement                 | CreditCard  | "Paiement", "Payment", "Prix"    |
+| `liability`       | Responsabilités          | Scale       | "Responsabilité", "Liability"    |
+| `ip`              | Propriété Intellectuelle | ShieldAlert | "Propriété intellectuelle", "IP" |
+| `confidentiality` | Confidentialité          | Lock        | "Confidentialité", "Secret"      |
+| `gdpr`            | RGPD                     | Shield      | "RGPD", "GDPR", "Données"        |
+| `jurisdiction`    | Juridiction              | Gavel       | "Juridiction", "Loi applicable"  |
+| `non_compete`     | Non-concurrence          | UserX       | "Non-concurrence", "Non-compete" |
+| `assignment`      | Cession/Sous-traitance   | Building2   | "Cession", "Assignment"          |
+| `other`           | Autre                    | FileText    | Any unmatched type               |
+
+**Color Schemes:**
+
+Each category has unique colors for badges and icons:
+
+- Parties: Blue
+- Objet: Purple
+- Durée: Green
+- Résiliation: Orange
+- Paiement: Emerald
+- Responsabilités: Red
+- Propriété Intellectuelle: Indigo
+- Confidentialité: Violet
+- RGPD: Cyan
+- Juridiction: Amber
+- Non-concurrence: Rose
+- Cession: Teal
+- Autre: Gray
+
+### Utilities
+
+#### toUiClause / toUiClauses
+
+Convert API clauses to UI clauses with generated ID, category, and preview.
+
+```typescript
+import { toUiClause, toUiClauses } from "@/src/lib/clause-utils";
+
+// Single clause
+const uiClause = toUiClause({
+  type: "Résiliation",
+  text: "Either party may terminate...",
+});
+// { id: "abc123", type: "Résiliation", category: "termination", text: "...", preview: "..." }
+
+// Multiple clauses
+const uiClauses = toUiClauses(analysis.clauses);
+```
+
+#### normalizeClauseCategory
+
+Automatically categorize a clause based on its type string.
+
+```typescript
+import { normalizeClauseCategory } from "@/src/constants/clauses";
+
+normalizeClauseCategory("Résiliation"); // "termination"
+normalizeClauseCategory("Propriété Intellectuelle"); // "ip"
+normalizeClauseCategory("RGPD"); // "gdpr"
+```
+
+**Normalization Rules:**
+
+- Case-insensitive matching
+- Supports French and English terms
+- Keyword-based detection (e.g., "résiliation", "termination", "fin" → `termination`)
+- Falls back to `"other"` if no match
+
+#### createClausePreview
+
+Create a clean preview from clause text (240-320 chars).
+
+```typescript
+import { createClausePreview } from "@/src/constants/clauses";
+
+const preview = createClausePreview(longText, 280);
+// "Article 1 - Parties: Le présent contrat est conclu entre..."
+```
+
+**Features:**
+
+- Default max length: 280 characters
+- Clean cut at sentence end (period) if available
+- Falls back to word boundary if no sentence end found
+- Adds "..." when truncated
+
+### Integration Example
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { ClausesTable } from "@/src/components/analysis/ClausesTable";
+import { toUiClauses } from "@/src/lib/clause-utils";
+import type { Clause } from "@/src/types/clause";
+
+export function AnalysisClausesTab({ analysis }) {
+  // Convert API clauses to UI clauses
+  const clauses: Clause[] = analysis.clauses || [];
+  const uiClauses = toUiClauses(clauses);
+
+  if (uiClauses.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Aucune clause extraite de ce contrat.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold">Clauses clés</h2>
+        <p className="text-muted-foreground">
+          Clauses essentielles extraites et catégorisées automatiquement.
+        </p>
+      </div>
+      <ClausesTable clauses={uiClauses} />
+    </div>
+  );
+}
+```
+
+### Responsive Behavior
+
+**Desktop (≥640px):**
+
+- Full table layout
+- Columns: Clause (type + badge), Extrait (preview), Actions (copy + view)
+- Hover effects on rows
+- Compact action buttons
+
+**Mobile (<640px):**
+
+- Stacked card layout
+- Each card shows: type, category badge, preview
+- "Voir plus" and "Copier" buttons
+- Optimized for touch interaction
+
+### Accessibility
+
+All components follow WCAG AA standards:
+
+- ✅ Proper ARIA labels on all interactive elements
+- ✅ `aria-label` on search input, sort select, and table
+- ✅ `aria-pressed` on category filter buttons
+- ✅ `role="status"` with `aria-live="polite"` for count updates
+- ✅ `role="dialog"` for detail modal
+- ✅ Semantic HTML structure (table, th, td on desktop)
+- ✅ Keyboard navigation (Tab, Enter, Escape)
+- ✅ Focus visible on all interactive elements
+- ✅ Color contrast ratios meet WCAG AA
+- ✅ Screen reader friendly
+
+### Testing
+
+Run tests with Playwright:
+
+```bash
+pnpm test tests/clauses-table.spec.ts
+```
+
+**Test Coverage:**
+
+- ✅ Clause table rendering
+- ✅ Category badges and icons
+- ✅ Search functionality
+- ✅ Category filtering
+- ✅ Sorting options
+- ✅ "Voir" button opens dialog
+- ✅ Dialog copy and close actions
+- ✅ Empty state display
+- ✅ Accessibility attributes
+- ✅ Responsive layouts (table/cards)
+- ✅ Dark mode compatibility
+- ✅ Keyboard navigation
+
+### Preview Length
+
+Clause previews are automatically truncated for optimal UX:
+
+- **Default length**: 280 characters
+- **Clean cut**: Prefers sentence end (period), falls back to word boundary
+- **Minimum cut point**: 70% of max length (196 chars)
+- **Indicator**: "..." appended when truncated
+- **Full text**: Available in detail dialog
+
+---
+
 ## Deployment
 
 ### Vercel (Recommended)

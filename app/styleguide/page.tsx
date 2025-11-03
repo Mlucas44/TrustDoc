@@ -27,13 +27,71 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { ClausesTable } from "@/src/components/analysis/ClausesTable";
 import { RedFlagList } from "@/src/components/analysis/RedFlagList";
 import { RiskGauge } from "@/src/components/analysis/RiskGauge";
 import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
+import { toUiClause } from "@/src/lib/clause-utils";
 import { type UiRedFlag } from "@/src/types/red-flag";
+
+import type { Clause } from "@/src/types/clause";
 
 export default function StyleguidePage() {
   const { toast } = useToast();
+
+  // Sample clauses data
+  const sampleClauses: Clause[] = [
+    {
+      type: "Parties",
+      text: 'Article 1 - Parties: Le présent contrat est conclu entre la société ACME Corp, SAS au capital de 100 000€, immatriculée au RCS de Paris sous le numéro 123 456 789, dont le siège social est situé au 123 Avenue des Champs-Élysées, 75008 Paris, représentée par M. Jean Dupont en qualité de Directeur Général, ci-après dénommée "le Client", d\'une part, et la société FreelancePro, EURL au capital de 10 000€, immatriculée au RCS de Lyon sous le numéro 987 654 321, dont le siège social est situé au 456 Rue de la République, 69002 Lyon, représentée par Mme Marie Martin en qualité de Gérante, ci-après dénommée "le Prestataire", d\'autre part.',
+    },
+    {
+      type: "Objet du contrat",
+      text: "Article 2 - Objet: Le présent contrat a pour objet de définir les conditions dans lesquelles le Prestataire s'engage à réaliser pour le compte du Client une mission de développement d'une application web de gestion commerciale, incluant la conception, le développement, les tests et la mise en production.",
+    },
+    {
+      type: "Durée",
+      text: "Article 3 - Durée: Le présent contrat est conclu pour une durée déterminée de 6 mois à compter de sa signature, soit du 1er janvier 2025 au 30 juin 2025. Il pourra être renouvelé par accord express des deux parties, formalisé par avenant signé au moins 30 jours avant l'échéance.",
+    },
+    {
+      type: "Résiliation",
+      text: "Article 8 - Résiliation: Chaque partie pourra résilier le présent contrat de plein droit, sans indemnité, en cas de manquement grave de l'autre partie à l'une quelconque de ses obligations contractuelles, après mise en demeure restée infructueuse pendant un délai de 15 jours. En cas de résiliation pour faute, la partie responsable devra indemniser l'autre partie du préjudice subi.",
+    },
+    {
+      type: "Conditions de paiement",
+      text: "Article 4 - Modalités de paiement: Le montant global de la prestation est fixé à 45 000€ HT (cinquante-quatre mille euros TTC). Le paiement s'effectuera en trois échéances: 30% à la signature (13 500€), 40% à la validation de la phase de développement (18 000€), et 30% à la livraison finale (13 500€). Les factures seront payables à 30 jours fin de mois par virement bancaire.",
+    },
+    {
+      type: "Limitation de responsabilité",
+      text: "Article 9 - Responsabilité: La responsabilité du Prestataire ne pourra être engagée qu'en cas de faute prouvée et sera limitée au montant des sommes effectivement versées au titre du présent contrat. Le Prestataire ne saurait être tenu responsable des dommages indirects, pertes d'exploitation, manques à gagner ou pertes de données.",
+    },
+    {
+      type: "Propriété Intellectuelle",
+      text: "Article 6 - Propriété intellectuelle: Les droits de propriété intellectuelle sur les développements réalisés dans le cadre de la mission seront transférés au Client à compter du paiement intégral du prix. Le Prestataire conserve néanmoins le droit d'utiliser les techniques, méthodes et savoir-faire généraux développés dans le cadre de cette mission pour d'autres projets.",
+    },
+    {
+      type: "Confidentialité",
+      text: "Article 7 - Confidentialité: Les parties s'engagent à conserver strictement confidentielles toutes les informations de nature commerciale, technique, financière ou stratégique dont elles auraient connaissance dans le cadre de l'exécution du présent contrat. Cette obligation de confidentialité perdurera pendant toute la durée du contrat et pendant une période de 3 ans après sa cessation.",
+    },
+    {
+      type: "Protection des données personnelles",
+      text: "Article 10 - RGPD: Dans le cadre de l'exécution du présent contrat, le Prestataire s'engage à respecter la réglementation en vigueur applicable au traitement de données à caractère personnel et, en particulier, le Règlement (UE) 2016/679 du Parlement européen et du Conseil du 27 avril 2016 (RGPD). Le Prestataire s'engage à ne traiter les données personnelles que sur instruction documentée du Client et à mettre en œuvre les mesures techniques et organisationnelles appropriées.",
+    },
+    {
+      type: "Loi applicable et juridiction",
+      text: "Article 12 - Juridiction compétente: Le présent contrat est régi par le droit français. Tout litige relatif à l'interprétation ou à l'exécution du présent contrat sera soumis à la compétence exclusive du Tribunal de Commerce de Paris, auquel les parties attribuent compétence territoriale, quel que soit le lieu d'exécution du contrat ou le domicile du défendeur.",
+    },
+    {
+      type: "Clause de non-concurrence",
+      text: "Article 11 - Non-concurrence: Pendant la durée du présent contrat et pendant une période de 12 mois suivant sa cessation, le Prestataire s'interdit de travailler directement ou indirectement pour tout concurrent du Client opérant sur le même secteur d'activité (logiciels de gestion commerciale) dans un rayon géographique de 100 km autour du siège social du Client.",
+    },
+    {
+      type: "Cession du contrat",
+      text: "Article 13 - Cession: Le présent contrat est conclu intuitu personae. En conséquence, aucune des parties ne pourra céder, transférer ou sous-traiter tout ou partie de ses droits et obligations au titre du présent contrat sans l'accord préalable et écrit de l'autre partie. Toute cession effectuée en violation de cette clause sera nulle et de nul effet.",
+    },
+  ];
+
+  const uiClauses = sampleClauses.map(toUiClause);
 
   // Sample red flags data
   const sampleRedFlags: UiRedFlag[] = [
@@ -448,6 +506,31 @@ export default function StyleguidePage() {
           <div>
             <h3 className="text-lg font-medium mb-4">Empty State</h3>
             <RedFlagList items={[]} />
+          </div>
+        </div>
+      </section>
+
+      {/* Clauses Section */}
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold mb-2">Clauses clés</h2>
+          <p className="text-muted-foreground">
+            Tableau responsive des clauses extraites d&apos;un contrat avec recherche, filtres et
+            actions.
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          {/* Full Example */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Exemple complet</h3>
+            <ClausesTable clauses={uiClauses} />
+          </div>
+
+          {/* Empty State */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">État vide</h3>
+            <ClausesTable clauses={[]} />
           </div>
         </div>
       </section>
