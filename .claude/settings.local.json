@@ -10,7 +10,11 @@
       "Bash(curl:*)",
       "Bash(pnpm test:*)",
       "Bash(git add:*)",
-      "Bash(pnpm dlx:*)"
+      "Bash(pnpm dlx:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(pnpm lint:fix:*)"
     ],
     "deny": [],
     "ask": []

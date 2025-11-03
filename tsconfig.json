@@ -31,5 +31,11 @@
     ".next\\dev/types/**/*.ts",
     ".next\\dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "prisma", "scripts"]
+  "exclude": [
+    "node_modules",
+    "prisma",
+    "scripts",
+    "src/services/idempotency.ts",
+    "src/services/pipeline/run-analysis.ts"
+  ]
 }

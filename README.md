@@ -1927,6 +1927,271 @@ pnpm test:ui tests/risk-visualization.spec.ts
 - ✅ Compatibilité mode sombre
 - ✅ Ratios de contraste visuel
 
+---
+
+## Red Flags List
+
+### Overview
+
+The Red Flags List components provide a comprehensive UI for displaying contract red flags with severity levels, search, filtering, and copy functionality. The system includes:
+
+- **Type-safe data structures** for red flags with severity levels
+- **RedFlagItem component** for individual red flag display
+- **RedFlagList component** with search and filtering
+- **useRedFlags hook** for state management
+- **Clipboard utility** with toast feedback
+
+### Components
+
+#### RedFlagItem
+
+Displays a single red flag in a card format.
+
+**Props:**
+
+| Prop        | Type        | Default     | Description              |
+| ----------- | ----------- | ----------- | ------------------------ |
+| `flag`      | `UiRedFlag` | Required    | Red flag data to display |
+| `className` | `string`    | `undefined` | Additional CSS classes   |
+
+**Example:**
+
+```tsx
+import { RedFlagItem } from "@/src/components/analysis/RedFlagItem";
+
+<RedFlagItem
+  flag={{
+    id: "rf_1",
+    title: "Unlimited Liability Clause",
+    severity: "high",
+    why: "This clause exposes you to unlimited financial liability...",
+    clause_excerpt: 'Section 7.3: "The Contractor shall be liable..."',
+  }}
+/>;
+```
+
+**Features:**
+
+- Severity badge with color coding (green/yellow/red)
+- "Why this matters" explanation text
+- Scrollable clause excerpt (max 1500 characters)
+- Copy to clipboard button with toast feedback
+- Icons from lucide-react based on severity
+- Full accessibility support
+
+#### RedFlagList
+
+Displays a filterable, searchable list of red flags.
+
+**Props:**
+
+| Prop              | Type                                   | Default     | Description                   |
+| ----------------- | -------------------------------------- | ----------- | ----------------------------- |
+| `items`           | `UiRedFlag[]`                          | Required    | Array of red flags to display |
+| `defaultSeverity` | `"low" \| "medium" \| "high" \| "all"` | `"all"`     | Initial severity filter       |
+| `defaultSearch`   | `string`                               | `""`        | Initial search query          |
+| `showCount`       | `boolean`                              | `true`      | Show count of filtered items  |
+| `className`       | `string`                               | `undefined` | Additional CSS classes        |
+
+**Example:**
+
+```tsx
+import { RedFlagList } from "@/src/components/analysis/RedFlagList";
+
+<RedFlagList items={redFlags} defaultSeverity="all" showCount />;
+```
+
+**Features:**
+
+- Search by title or "why" text
+- Filter by severity level (all/low/medium/high)
+- Automatic sorting: high → medium → low, then alphabetically
+- Item counter with aria-live updates
+- Empty state with helpful message
+- Fully accessible with ARIA labels
+
+### Hook: useRedFlags
+
+Manages red flags filtering, searching, and sorting with memoization.
+
+**Usage:**
+
+```typescript
+import { useRedFlags } from "@/src/hooks/useRedFlags";
+
+function MyComponent({ redFlags }: { redFlags: UiRedFlag[] }) {
+  const {
+    filteredItems,
+    searchQuery,
+    setSearchQuery,
+    severityFilter,
+    setSeverityFilter,
+    totalCount,
+    filteredCount
+  } = useRedFlags(redFlags, {
+    defaultSeverity: "all",
+    defaultSearch: ""
+  });
+
+  return (
+    <div>
+      <input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+      />
+      <p>Showing {filteredCount} of {totalCount} red flags</p>
+      {filteredItems.map(flag => <RedFlagItem key={flag.id} flag={flag} />)}
+    </div>
+  );
+}
+```
+
+**Return Value:**
+
+| Property            | Type                       | Description                   |
+| ------------------- | -------------------------- | ----------------------------- |
+| `filteredItems`     | `UiRedFlag[]`              | Filtered and sorted red flags |
+| `searchQuery`       | `string`                   | Current search query          |
+| `setSearchQuery`    | `(query: string) => void`  | Update search query           |
+| `severityFilter`    | `RedFlagSeverity \| "all"` | Current severity filter       |
+| `setSeverityFilter` | `(severity) => void`       | Update severity filter        |
+| `totalCount`        | `number`                   | Total items before filtering  |
+| `filteredCount`     | `number`                   | Number of filtered items      |
+
+### Types
+
+```typescript
+// Severity level
+export type RedFlagSeverity = "low" | "medium" | "high";
+
+// Base red flag structure (from API)
+export interface RedFlag {
+  title: string;
+  severity: RedFlagSeverity;
+  why: string;
+  clause_excerpt: string;
+}
+
+// UI red flag with client-generated ID
+export interface UiRedFlag extends RedFlag {
+  id: string; // Generated with nanoid
+}
+```
+
+### Severity Configuration
+
+**Labels:**
+
+- `high` → "High"
+- `medium` → "Medium"
+- `low` → "Low"
+
+**Sort Order:**
+
+1. High severity items first
+2. Medium severity items second
+3. Low severity items last
+4. Within same severity: alphabetical by title
+
+**Color Schemes:**
+
+| Severity | Badge  | Text   | Background     | Icon           |
+| -------- | ------ | ------ | -------------- | -------------- |
+| High     | Red    | Red    | Red (light)    | alert-triangle |
+| Medium   | Yellow | Yellow | Yellow (light) | alert-circle   |
+| Low      | Green  | Green  | Green (light)  | info           |
+
+### Clipboard Utility
+
+```typescript
+import { copyToClipboard } from "@/src/lib/clipboard";
+
+async function handleCopy() {
+  try {
+    await copyToClipboard(text);
+    toast({ title: "Copied!" });
+  } catch (error) {
+    toast({ title: "Copy failed", variant: "destructive" });
+  }
+}
+```
+
+**Features:**
+
+- Uses modern Clipboard API when available
+- Fallback to `document.execCommand()` for older browsers
+- Type-safe with TypeScript
+
+### Integration Example
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { nanoid } from "nanoid";
+import { RedFlagList } from "@/src/components/analysis/RedFlagList";
+import type { RedFlag, UiRedFlag } from "@/src/types/red-flag";
+
+export function AnalysisResultPage({ analysis }) {
+  // Convert API red flags to UI red flags
+  const redFlags: UiRedFlag[] = analysis.red_flags.map((flag: RedFlag) => ({
+    ...flag,
+    id: nanoid(), // Generate client-side ID
+  }));
+
+  return (
+    <div className="space-y-6">
+      <h2>Contract Red Flags</h2>
+      <RedFlagList items={redFlags} />
+    </div>
+  );
+}
+```
+
+### Accessibility
+
+All components follow WCAG AA standards:
+
+- ✅ Proper ARIA labels on all interactive elements
+- ✅ `role="article"` for red flag items
+- ✅ `role="status"` with `aria-live="polite"` for count updates
+- ✅ Semantic HTML structure
+- ✅ Keyboard navigation support
+- ✅ Color contrast ratios meet WCAG AA
+- ✅ Screen reader friendly text
+
+### Clause Excerpt Length
+
+Clause excerpts are automatically truncated:
+
+- **Maximum length**: 1500 characters
+- **Format**: Monospace font in scrollable container
+- **Max height**: 300px with scroll
+- **Truncation indicator**: "..." appended when truncated
+
+### Testing
+
+Run tests with Playwright:
+
+```bash
+pnpm test tests/red-flags.spec.ts
+```
+
+**Test Coverage:**
+
+- ✅ Red flag item rendering
+- ✅ Severity badge display
+- ✅ Search functionality
+- ✅ Severity filtering
+- ✅ Sorting behavior
+- ✅ Copy button functionality
+- ✅ Empty state display
+- ✅ Accessibility attributes
+- ✅ Dark mode compatibility
+- ✅ ARIA live regions
+
+---
+
 ## Deployment
 
 ### Vercel (Recommended)

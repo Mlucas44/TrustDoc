@@ -27,11 +27,49 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { RedFlagList } from "@/src/components/analysis/RedFlagList";
 import { RiskGauge } from "@/src/components/analysis/RiskGauge";
 import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
+import { type UiRedFlag } from "@/src/types/red-flag";
 
 export default function StyleguidePage() {
   const { toast } = useToast();
+
+  // Sample red flags data
+  const sampleRedFlags: UiRedFlag[] = [
+    {
+      id: "rf_1",
+      title: "Unlimited Liability Clause",
+      severity: "high",
+      why: "This clause exposes you to unlimited financial liability for damages beyond your control, which could result in catastrophic financial loss.",
+      clause_excerpt:
+        'Section 7.3: "The Contractor shall be liable for any and all damages, losses, costs, and expenses arising from or related to the performance of this Agreement, without limitation as to amount or type. This liability shall extend to indirect, consequential, and punitive damages."',
+    },
+    {
+      id: "rf_2",
+      title: "Unclear Termination Conditions",
+      severity: "medium",
+      why: "The termination clause is ambiguous about what constitutes a valid reason for contract termination, potentially leading to disputes.",
+      clause_excerpt:
+        'Section 9.1: "Either party may terminate this Agreement for convenience with notice to the other party. The terminating party shall provide reasonable notice under the circumstances."',
+    },
+    {
+      id: "rf_3",
+      title: "Intellectual Property Ambiguity",
+      severity: "medium",
+      why: "The ownership of work products and intellectual property created during the project is not clearly defined, which may lead to disputes.",
+      clause_excerpt:
+        'Section 5.2: "All work products shall be considered jointly owned by both parties. Each party retains rights to use such work products in their respective businesses."',
+    },
+    {
+      id: "rf_4",
+      title: "Non-Standard Payment Terms",
+      severity: "low",
+      why: "Payment terms deviate from industry standard (Net 30), but are still reasonable and clearly defined.",
+      clause_excerpt:
+        'Section 4.1: "Payment shall be made within 60 days of invoice receipt. Late payments will incur a 1% monthly interest charge."',
+    },
+  ];
 
   return (
     <div className="space-y-12">
@@ -381,6 +419,36 @@ export default function StyleguidePage() {
               />
             </CardContent>
           </Card>
+        </div>
+      </section>
+
+      {/* Red Flags Section */}
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold mb-2">Red Flags List</h2>
+          <p className="text-muted-foreground">
+            Display contract red flags with severity levels, search, and filtering capabilities.
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          {/* Full Example */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Full Example with All Features</h3>
+            <RedFlagList items={sampleRedFlags} />
+          </div>
+
+          {/* Filtered by High Severity */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Pre-filtered by High Severity</h3>
+            <RedFlagList items={sampleRedFlags} defaultSeverity="high" />
+          </div>
+
+          {/* Empty State */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Empty State</h3>
+            <RedFlagList items={[]} />
+          </div>
         </div>
       </section>
     </div>
