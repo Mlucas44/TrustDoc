@@ -41,6 +41,9 @@ export type ListAnalysesOptions = {
   cursor?: string;
   type?: ContractType;
   includeDeleted?: boolean;
+  riskMin?: number;
+  riskMax?: number;
+  q?: string;
 };
 
 /**
@@ -90,18 +93,28 @@ export class AnalysisRepo {
   }
 
   /**
-   * List analyses for a user with pagination
+   * List analyses for a user with pagination and filters
    */
   static async listByUser(
     userId: string,
     options: ListAnalysesOptions = {}
   ): Promise<AppAnalysis[]> {
-    const { limit = 10, cursor, type, includeDeleted = false } = options;
+    const { limit = 10, cursor, type, includeDeleted = false, riskMin, riskMax, q } = options;
 
     const where: Prisma.AnalysisWhereInput = {
       userId,
       ...(type && { type }),
       ...(includeDeleted ? {} : { deletedAt: null }),
+      ...(riskMin !== undefined && { riskScore: { gte: riskMin } }),
+      ...(riskMax !== undefined && {
+        riskScore: riskMin !== undefined ? { gte: riskMin, lte: riskMax } : { lte: riskMax },
+      }),
+      ...(q && {
+        filename: {
+          contains: q,
+          mode: "insensitive",
+        },
+      }),
     };
 
     return prisma.analysis.findMany({
