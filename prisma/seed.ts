@@ -186,7 +186,7 @@ function displaySummary(users: any[], analyses: any[]) {
   console.log(`   Average:   ${avgRisk}%`);
   console.log(`\n📑 Contract Types:`);
   Object.entries(typeDistribution)
-    .sort(([, a], [, b]) => b - a)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
     .forEach(([type, count]) => {
       console.log(`   ${type.padEnd(12)} ${count}`);
     });
