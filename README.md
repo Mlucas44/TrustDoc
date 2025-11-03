@@ -1754,6 +1754,8 @@ TrustDoc utilise **Tailwind CSS** et **shadcn/ui** pour le design system.
 - **Dialog** - Modales
 - **Tabs** - Onglets
 - **Toast** - Notifications
+- **RiskScoreBadge** - Badge de niveau de risque (Low/Medium/High)
+- **RiskGauge** - Jauge visuelle de score de risque avec animation
 
 ### Dark Mode
 
@@ -1775,6 +1777,155 @@ Consultez [docs/UI_COMPONENTS.md](docs/UI_COMPONENTS.md) pour:
 ### Styleguide
 
 Visualisez tous les composants sur [http://localhost:3000/styleguide](http://localhost:3000/styleguide)
+
+### Risk Visualization
+
+Les composants de visualisation de risque permettent d'afficher le score et le niveau de risque des contrats analysés de manière claire et accessible.
+
+#### Risk Thresholds (Seuils de risque)
+
+Les niveaux de risque sont définis dans `src/constants/risk.ts`:
+
+| Level  | Score Range | Color  | Badge Style                     |
+| ------ | ----------- | ------ | ------------------------------- |
+| Low    | 0 - 33      | Green  | `bg-green-100 text-green-800`   |
+| Medium | 34 - 66     | Yellow | `bg-yellow-100 text-yellow-800` |
+| High   | 67 - 100    | Red    | `bg-red-100 text-red-800`       |
+
+#### RiskScoreBadge Component
+
+Badge coloré affichant le niveau de risque.
+
+**Props**:
+
+```typescript
+{
+  score: number;          // Score de risque (0-100)
+  size?: "sm" | "md" | "lg"; // Taille du badge (défaut: "md")
+  showScore?: boolean;    // Afficher le score numérique (défaut: false)
+  className?: string;     // Classes CSS additionnelles
+}
+```
+
+**Exemples d'utilisation**:
+
+```tsx
+import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
+
+// Badge simple
+<RiskScoreBadge score={25} />
+// Affiche: "Low" (badge vert)
+
+// Avec score numérique
+<RiskScoreBadge score={57} showScore />
+// Affiche: "Medium (57)" (badge jaune)
+
+// Taille large
+<RiskScoreBadge score={85} size="lg" />
+// Affiche: "High" (badge rouge, plus grand)
+```
+
+#### RiskGauge Component
+
+Jauge visuelle complète avec barre de progression, score numérique, et texte de justification.
+
+**Props**:
+
+```typescript
+{
+  score: number;          // Score de risque (0-100)
+  justification?: string; // Texte explicatif du score
+  animate?: boolean;      // Animation du score (défaut: true)
+  className?: string;     // Classes CSS additionnelles
+}
+```
+
+**Exemples d'utilisation**:
+
+```tsx
+import { RiskGauge } from "@/src/components/analysis/RiskGauge";
+
+// Jauge simple
+<RiskGauge score={42} />
+
+// Avec justification
+<RiskGauge
+  score={57}
+  justification="Multiple unclear clauses regarding payment terms and intellectual property rights require clarification."
+/>
+
+// Sans animation (pour tests ou captures)
+<RiskGauge score={85} animate={false} />
+```
+
+**Intégration dans une page de résultat**:
+
+```tsx
+import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
+import { RiskGauge } from "@/src/components/analysis/RiskGauge";
+
+export function AnalysisResultPage({ analysis }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>{analysis.filename}</CardTitle>
+            <CardDescription>Analyzed {analysis.createdAt}</CardDescription>
+          </div>
+          <RiskScoreBadge score={analysis.riskScore} showScore size="lg" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <RiskGauge score={analysis.riskScore} justification={analysis.riskJustification} />
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+#### Accessibility Features
+
+Les composants de visualisation de risque sont conçus pour être accessibles:
+
+- **ARIA Labels**: Tous les composants incluent des `aria-label` descriptifs
+  - Badge: `aria-label="Risk score: Medium (57%)"`
+  - Gauge: `role="region" aria-label="Risk score gauge"`
+  - Progress: `role="progressbar" aria-valuenow="57" aria-valuemin="0" aria-valuemax="100"`
+
+- **Contrast Ratios**: Conformité WCAG AA
+  - Mode clair: contraste optimal sur fond blanc
+  - Mode sombre: couleurs ajustées automatiquement via `dark:` variants
+
+- **Animations**: Accessibles et désactivables
+  - Animation douce du score (1 seconde)
+  - Peut être désactivée avec `animate={false}`
+  - Respecte `prefers-reduced-motion` (à implémenter)
+
+#### Testing
+
+Les tests sont disponibles dans `tests/risk-visualization.spec.ts`:
+
+```bash
+# Exécuter les tests de visualisation de risque
+pnpm test tests/risk-visualization.spec.ts
+
+# Tests avec UI mode
+pnpm test:ui tests/risk-visualization.spec.ts
+```
+
+**Couverture des tests**:
+
+- ✅ Classification des niveaux de risque (getRiskLevel)
+- ✅ Seuils de frontière (33, 66, 100)
+- ✅ Variantes de couleur des badges (vert/jaune/rouge)
+- ✅ Rendu de la barre de progression
+- ✅ Affichage du score numérique
+- ✅ Labels de niveau de risque
+- ✅ Affichage du texte de justification
+- ✅ Attributs d'accessibilité (ARIA)
+- ✅ Compatibilité mode sombre
+- ✅ Ratios de contraste visuel
 
 ## Deployment
 

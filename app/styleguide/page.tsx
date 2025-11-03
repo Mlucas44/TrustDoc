@@ -27,6 +27,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { RiskGauge } from "@/src/components/analysis/RiskGauge";
+import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
 
 export default function StyleguidePage() {
   const { toast } = useToast();
@@ -265,6 +267,120 @@ export default function StyleguidePage() {
           <Shield className="h-8 w-8 text-primary" />
           <FileCheck className="h-8 w-8 text-primary" />
           <Zap className="h-8 w-8 text-primary" />
+        </div>
+      </section>
+
+      <section className="space-y-8">
+        <h2 className="text-2xl font-semibold">Risk Visualization</h2>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">Risk Score Badges</h3>
+          <p className="text-sm text-muted-foreground">
+            Display risk levels with color-coded badges. Supports three risk levels: Low (0-33),
+            Medium (34-66), High (67-100).
+          </p>
+          <div className="flex flex-wrap gap-6 items-center">
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Small</p>
+              <div className="flex gap-2">
+                <RiskScoreBadge score={25} size="sm" />
+                <RiskScoreBadge score={50} size="sm" />
+                <RiskScoreBadge score={85} size="sm" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Medium (default)</p>
+              <div className="flex gap-2">
+                <RiskScoreBadge score={25} />
+                <RiskScoreBadge score={50} />
+                <RiskScoreBadge score={85} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Large</p>
+              <div className="flex gap-2">
+                <RiskScoreBadge score={25} size="lg" />
+                <RiskScoreBadge score={50} size="lg" />
+                <RiskScoreBadge score={85} size="lg" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">With Score</p>
+              <div className="flex gap-2">
+                <RiskScoreBadge score={25} showScore />
+                <RiskScoreBadge score={50} showScore />
+                <RiskScoreBadge score={85} showScore />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">Risk Gauge</h3>
+          <p className="text-sm text-muted-foreground">
+            Complete risk visualization with animated progress bar, score display, and optional
+            justification text.
+          </p>
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Low Risk Example</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RiskGauge
+                  score={25}
+                  justification="Contract has standard terms with clear termination clauses and reasonable notice periods."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Medium Risk Example</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RiskGauge
+                  score={57}
+                  justification="Multiple unclear clauses regarding payment terms and intellectual property rights require clarification."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">High Risk Example</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RiskGauge
+                  score={89}
+                  justification="Serious concerns identified: unlimited liability clause, no termination rights, and highly unfavorable payment terms."
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">Usage Example</h3>
+          <Card>
+            <CardHeader>
+              <CardTitle>Contract Analysis Result</CardTitle>
+              <CardDescription>Example integration in analysis page</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <h4 className="font-semibold">Freelance Agreement.pdf</h4>
+                  <p className="text-sm text-muted-foreground">Analyzed 2 hours ago</p>
+                </div>
+                <RiskScoreBadge score={42} showScore size="lg" />
+              </div>
+              <RiskGauge
+                score={42}
+                justification="The contract contains some ambiguous clauses regarding project scope and payment milestones. Review sections 3.2 and 5.1 carefully before signing."
+              />
+            </CardContent>
+          </Card>
         </div>
       </section>
     </div>
