@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ClausesTable } from "@/src/components/analysis/ClausesTable";
+import { ExportButtons } from "@/src/components/analysis/ExportButtons";
 import { RedFlagList } from "@/src/components/analysis/RedFlagList";
 import { RiskGauge } from "@/src/components/analysis/RiskGauge";
 import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
@@ -531,6 +532,36 @@ export default function StyleguidePage() {
           <div>
             <h3 className="text-lg font-medium mb-4">État vide</h3>
             <ClausesTable clauses={[]} />
+          </div>
+        </div>
+      </section>
+
+      {/* Export Buttons Section */}
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold mb-2">Export de l&apos;analyse</h2>
+          <p className="text-muted-foreground">
+            Boutons pour exporter l&apos;analyse complète en JSON ou Markdown.
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          {/* Default Size */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Taille par défaut</h3>
+            <ExportButtons analysisId="sample-123" />
+          </div>
+
+          {/* Small Size */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Petite taille</h3>
+            <ExportButtons analysisId="sample-123" size="sm" />
+          </div>
+
+          {/* Large Size */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Grande taille</h3>
+            <ExportButtons analysisId="sample-123" size="lg" />
           </div>
         </div>
       </section>

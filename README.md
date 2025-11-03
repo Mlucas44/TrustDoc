@@ -2505,6 +2505,281 @@ Clause previews are automatically truncated for optimal UX:
 
 ---
 
+## Export Analysis
+
+TrustDoc provides secure export functionality to download analysis results in JSON or Markdown formats. This allows users to archive, share, or integrate analysis data into their own systems.
+
+### Export Formats
+
+**JSON Export** (`/api/analysis/[id]/export.json`)
+
+- Structured data format
+- Version-controlled schema (v1.0.0)
+- Machine-readable
+- Ideal for integrations and data processing
+
+**Markdown Export** (`/api/analysis/[id]/export.md`)
+
+- Human-readable document
+- Formatted with tables and sections
+- Includes risk badges and metadata
+- Ideal for reports and documentation
+
+### ExportButtons Component
+
+The `ExportButtons` component provides a user-friendly interface for downloading analysis exports.
+
+**Props:**
+
+| Prop         | Type                        | Default     | Description            |
+| ------------ | --------------------------- | ----------- | ---------------------- |
+| `analysisId` | `string`                    | Required    | Analysis ID to export  |
+| `className`  | `string`                    | `undefined` | Additional CSS classes |
+| `size`       | `"default" \| "sm" \| "lg"` | `"default"` | Button size            |
+
+**Example:**
+
+```tsx
+import { ExportButtons } from "@/src/components/analysis/ExportButtons";
+
+// In your analysis page
+<ExportButtons analysisId={analysis.id} />
+
+// With custom size
+<ExportButtons analysisId={analysis.id} size="sm" />
+```
+
+**Features:**
+
+- Toast notifications on success/error
+- Loading state with spinner animation
+- Automatic file download with proper filename
+- Disabled state during export to prevent duplicate requests
+
+### Export API Endpoints
+
+Both endpoints require authentication and verify ownership before allowing export.
+
+**GET `/api/analysis/[id]/export.json`**
+
+Returns analysis data in JSON format.
+
+**Response Headers:**
+
+```
+Content-Type: application/json
+Content-Disposition: attachment; filename="trustdoc-[id]-[slug].json"
+Cache-Control: no-store
+```
+
+**JSON Structure:**
+
+```json
+{
+  "id": "abc123",
+  "filename": "contract.pdf",
+  "createdAt": "2025-01-15T10:30:00.000Z",
+  "typeContrat": "Contrat de prestation",
+  "riskScore": 65,
+  "riskJustification": "Several high-risk clauses detected...",
+  "summary": "This is a service agreement between...",
+  "redFlags": [
+    {
+      "category": "Liability",
+      "description": "Unlimited liability clause",
+      "severity": 3
+    }
+  ],
+  "clauses": [
+    {
+      "type": "Payment Terms",
+      "text": "Full clause text here..."
+    }
+  ],
+  "version": "1.0.0"
+}
+```
+
+**GET `/api/analysis/[id]/export.md`**
+
+Returns analysis data as formatted Markdown.
+
+**Response Headers:**
+
+```
+Content-Type: text/markdown; charset=utf-8
+Content-Disposition: attachment; filename="trustdoc-[id]-[slug].md"
+Cache-Control: no-store
+```
+
+**Markdown Structure:**
+
+```markdown
+# Analyse TrustDoc - contract.pdf
+
+## Métadonnées
+
+| Champ               | Valeur                  |
+| ------------------- | ----------------------- |
+| **ID**              | `abc123`                |
+| **Fichier**         | contract.pdf            |
+| **Date d'analyse**  | 15 janvier 2025 à 10:30 |
+| **Type de contrat** | Contrat de prestation   |
+| **Score de risque** | 65/100 🟠 Élevé         |
+
+## Résumé
+
+- Summary point 1
+- Summary point 2
+
+## Évaluation du risque
+
+**Score:** 65/100 🟠 Élevé
+
+**Justification:**
+Several high-risk clauses detected...
+
+## Points d'attention (Red Flags)
+
+| Catégorie | Description                | Gravité  |
+| --------- | -------------------------- | -------- |
+| Liability | Unlimited liability clause | Critique |
+
+## Clauses clés
+
+### 1. Payment Terms
+
+Full clause text here...
+
+---
+
+_Document généré par TrustDoc - Plateforme d'analyse contractuelle_
+
+**Avertissement:** Cette analyse est fournie à titre informatif uniquement...
+```
+
+### Export Utilities
+
+**`slugifyFilename(filename: string): string`**
+
+Converts filenames to URL-safe slugs for use in Content-Disposition headers.
+
+```typescript
+import { slugifyFilename } from "@/src/lib/export-utils";
+
+slugifyFilename("Contrat de Vente 2024.pdf");
+// => "contrat-de-vente-2024"
+
+slugifyFilename("Accord_Confidentiel (v2).docx");
+// => "accord-confidentiel-v2"
+```
+
+**Features:**
+
+- Removes file extensions
+- Converts to lowercase
+- Normalizes accented characters (NFD decomposition)
+- Replaces non-alphanumeric characters with hyphens
+- Removes leading/trailing hyphens
+- Limits length to 50 characters
+
+**`toExportAnalysis(analysis): ExportAnalysis`**
+
+Converts database analysis records to export format.
+
+```typescript
+import { toExportAnalysis } from "@/src/lib/export-utils";
+
+const dbAnalysis = await AnalysisRepo.getById(id, userId);
+const exportData = toExportAnalysis(dbAnalysis);
+```
+
+**Features:**
+
+- Parses JSON fields (redFlagsJson, clausesJson)
+- Handles null/invalid JSON gracefully (defaults to empty arrays)
+- Converts Date objects to ISO strings
+- Adds version field
+
+**`generateMarkdown(analysis: ExportAnalysis): string`**
+
+Generates formatted Markdown from export analysis data.
+
+```typescript
+import { generateMarkdown } from "@/src/services/export/markdown";
+
+const markdown = generateMarkdown(exportData);
+```
+
+**Features:**
+
+- Structured document with all sections
+- Risk score badges (🔴 Critique, 🟠 Élevé, 🟡 Modéré, 🟢 Faible)
+- Severity labels (Critique, Élevée, Modérée)
+- Backtick escaping for code safety
+- LF line endings (Unix-style)
+- Empty state handling
+- Footer disclaimer
+
+### Security & Authorization
+
+Both export endpoints enforce strict security:
+
+1. **Authentication Required**: User must be logged in
+2. **Ownership Verification**: `AnalysisRepo.getById(id, userId)` ensures user owns the analysis
+3. **No Cache**: `Cache-Control: no-store` prevents caching sensitive data
+4. **No PDF Included**: Original PDF is never included in exports
+
+**Error Responses:**
+
+- `401 Unauthorized`: User not authenticated
+- `404 Not Found`: Analysis doesn't exist or user doesn't own it
+- `500 Internal Server Error`: Unexpected error during export
+
+### Testing
+
+Export functionality is tested in `tests/export.spec.ts`:
+
+**Test Coverage:**
+
+- ✅ Export buttons rendering
+- ✅ Button icons and sizes
+- ✅ slugifyFilename utility
+- ✅ Markdown generation structure
+- ✅ Markdown empty state handling
+- ✅ Backtick escaping
+- ✅ toExportAnalysis conversion
+- ✅ Handling null/invalid JSON
+- ✅ Export version constant
+- ✅ Risk badge mapping
+- ✅ Severity labels
+- ✅ LF line endings
+
+### Integration Example
+
+To add export buttons to your analysis page:
+
+```tsx
+import { ExportButtons } from "@/src/components/analysis/ExportButtons";
+
+export default function AnalysisPage({ params }) {
+  const { id } = params;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1>Analysis Results</h1>
+        <ExportButtons analysisId={id} />
+      </div>
+
+      {/* Rest of analysis display */}
+    </div>
+  );
+}
+```
+
+---
+
 ## Deployment
 
 ### Vercel (Recommended)
