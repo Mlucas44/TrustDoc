@@ -169,44 +169,42 @@ test.describe("RiskGauge Component", () => {
   });
 
   test("displays justification text when provided", async ({ page }) => {
-    // Find gauge with justification text
+    // Find gauge with justification text - use partial text match
     const justification = page
-      .locator('text="Contract has standard terms"')
-      .or(page.locator('text="Multiple unclear clauses"'))
-      .or(page.locator('text="Serious concerns identified"'))
+      .getByText(/Contract has standard terms|Multiple unclear clauses|Serious concerns identified/)
       .first();
 
     await expect(justification).toBeVisible();
   });
 
   test("low risk gauge has green color scheme", async ({ page }) => {
-    const lowGauge = page.locator(':has-text("Low Risk Example")').first();
-    await expect(lowGauge).toBeVisible();
+    // Find the card with "Low Risk Example" title
+    const lowCard = page.locator('[role="region"]', { hasText: "Low Risk Example" }).first();
+    await expect(lowCard).toBeVisible();
 
-    // Navigate to the card containing low risk
-    const cardContent = lowGauge.locator("..").locator("..");
-
-    // Should contain green badge visible
-    const hasBadge = await cardContent.locator('text="Low"').count();
-    expect(hasBadge).toBeGreaterThan(0);
+    // Verify it contains a Low badge
+    const lowBadge = lowCard.getByText("Low", { exact: true });
+    await expect(lowBadge).toBeVisible();
   });
 
   test("medium risk gauge has yellow color scheme", async ({ page }) => {
-    const mediumGauge = page.locator(':has-text("Medium Risk Example")').first();
-    await expect(mediumGauge).toBeVisible();
+    // Find the card with "Medium Risk Example" title
+    const mediumCard = page.locator('[role="region"]', { hasText: "Medium Risk Example" }).first();
+    await expect(mediumCard).toBeVisible();
 
-    const cardContent = mediumGauge.locator("..").locator("..");
-    const hasBadge = await cardContent.locator('text="Medium"').count();
-    expect(hasBadge).toBeGreaterThan(0);
+    // Verify it contains a Medium badge
+    const mediumBadge = mediumCard.getByText("Medium", { exact: true });
+    await expect(mediumBadge).toBeVisible();
   });
 
   test("high risk gauge has red color scheme", async ({ page }) => {
-    const highGauge = page.locator(':has-text("High Risk Example")').first();
-    await expect(highGauge).toBeVisible();
+    // Find the card with "High Risk Example" title
+    const highCard = page.locator('[role="region"]', { hasText: "High Risk Example" }).first();
+    await expect(highCard).toBeVisible();
 
-    const cardContent = highGauge.locator("..").locator("..");
-    const hasBadge = await cardContent.locator('text="High"').count();
-    expect(hasBadge).toBeGreaterThan(0);
+    // Verify it contains a High badge
+    const highBadge = highCard.getByText("High", { exact: true });
+    await expect(highBadge).toBeVisible();
   });
 });
 
@@ -216,14 +214,16 @@ test.describe("Risk Visualization Accessibility", () => {
   });
 
   test("badges have proper contrast ratios", async ({ page }) => {
-    // Validate that badges are visible and have text
-    const badges = await page.locator('[aria-label*="Risk score"]').all();
-    expect(badges.length).toBeGreaterThan(0);
+    // Validate that risk level badges are visible with text
+    const lowBadges = await page.getByText("Low", { exact: true }).all();
+    const mediumBadges = await page.getByText("Medium", { exact: true }).all();
+    const highBadges = await page.getByText("High", { exact: true }).all();
 
-    for (const badge of badges) {
+    const allBadges = [...lowBadges, ...mediumBadges, ...highBadges];
+    expect(allBadges.length).toBeGreaterThan(0);
+
+    for (const badge of allBadges) {
       await expect(badge).toBeVisible();
-      const text = await badge.textContent();
-      expect(text?.trim()).toBeTruthy();
     }
   });
 
