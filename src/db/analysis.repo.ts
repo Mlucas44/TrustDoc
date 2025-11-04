@@ -164,10 +164,15 @@ export class AnalysisRepo {
   }
 
   /**
-   * Soft delete analysis
+   * Soft delete analysis (idempotent)
    * Only the owner can delete their analysis
+   *
+   * @returns { ok: true } on success, throws on ownership/not found errors
    */
-  static async softDelete(id: string, userId: string): Promise<AppAnalysis> {
+  static async softDelete(
+    id: string,
+    userId: string
+  ): Promise<{ ok: true; alreadyDeleted: boolean }> {
     // Verify ownership
     const analysis = await this.getById(id);
     if (!analysis) {
@@ -178,22 +183,46 @@ export class AnalysisRepo {
       throw new Error(`User ${userId} does not own analysis ${id}`);
     }
 
-    return prisma.analysis.update({
+    // Idempotent: if already deleted, return success
+    if (analysis.deletedAt) {
+      return { ok: true, alreadyDeleted: true };
+    }
+
+    await prisma.analysis.update({
       where: { id },
       data: { deletedAt: new Date() },
-      select: {
-        id: true,
-        userId: true,
-        filename: true,
-        type: true,
-        textLength: true,
-        summary: true,
-        riskScore: true,
-        redFlags: true,
-        clauses: true,
-        createdAt: true,
-        deletedAt: true,
-      },
     });
+
+    return { ok: true, alreadyDeleted: false };
+  }
+
+  /**
+   * Restore soft-deleted analysis
+   * Only the owner can restore their analysis
+   *
+   * @returns { ok: true } on success, throws on ownership/not found errors
+   */
+  static async restore(id: string, userId: string): Promise<{ ok: true; wasDeleted: boolean }> {
+    // Verify ownership
+    const analysis = await this.getById(id);
+    if (!analysis) {
+      throw new Error(`Analysis ${id} not found`);
+    }
+
+    if (analysis.userId !== userId) {
+      throw new Error(`User ${userId} does not own analysis ${id}`);
+    }
+
+    // If not deleted, return success (idempotent)
+    if (!analysis.deletedAt) {
+      return { ok: true, wasDeleted: false };
+    }
+
+    await prisma.analysis.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    return { ok: true, wasDeleted: true };
   }
 }

@@ -7,16 +7,28 @@
  * Desktop: Full table | Mobile: Card list
  */
 
-import { AlertTriangle, FileText, Search, X } from "lucide-react";
+import { AlertTriangle, FileText, Search, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
 
 import type { ContractType } from "@prisma/client";
@@ -48,8 +60,11 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [localItems, setLocalItems] = useState(items);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("fr-FR", {
@@ -99,6 +114,40 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
     });
   };
 
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+
+    try {
+      const response = await fetch(`/api/analysis/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok || response.status === 204) {
+        // Remove from local state
+        setLocalItems((prev) => prev.filter((item) => item.id !== id));
+
+        toast({
+          title: "Analyse supprimée",
+          description: "L'analyse a été retirée de votre historique.",
+        });
+
+        // Refresh the page data
+        router.refresh();
+      } else {
+        throw new Error("Failed to delete analysis");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'analyse. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -137,7 +186,7 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
       </div>
 
       {/* Table (Desktop) */}
-      {items.length > 0 ? (
+      {localItems.length > 0 ? (
         <>
           <div className="hidden sm:block rounded-md border overflow-hidden">
             <table className="w-full">
@@ -151,7 +200,7 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {items.map((item) => (
+                {localItems.map((item) => (
                   <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -197,6 +246,37 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                         <Button asChild variant="ghost" size="sm">
                           <Link href={`/analysis/${item.id}`}>Ouvrir</Link>
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              title="Supprimer l'analyse"
+                              disabled={deletingId === item.id}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer cette analyse ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Cette action retirera l&apos;analyse de votre historique. Vous
+                                pourrez toujours la restaurer pendant un court délai.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(item.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Supprimer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </td>
                   </tr>
@@ -207,7 +287,7 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
 
           {/* Card List (Mobile) */}
           <div className="sm:hidden space-y-3">
-            {items.map((item) => (
+            {localItems.map((item) => (
               <Card key={item.id}>
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -251,6 +331,37 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                     <Button asChild variant="outline" size="sm" className="flex-1">
                       <Link href={`/analysis/${item.id}`}>Ouvrir l&apos;analyse</Link>
                     </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0 text-destructive hover:text-destructive"
+                          title="Supprimer l'analyse"
+                          disabled={deletingId === item.id}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer cette analyse ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Cette action retirera l&apos;analyse de votre historique. Vous pourrez
+                            toujours la restaurer pendant un court délai.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(item.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </CardContent>
               </Card>
