@@ -80,6 +80,29 @@ export function isValidPackType(pack: string): pack is PackType {
 }
 
 /**
+ * Get pack information from Stripe Price ID
+ * Used by webhook to resolve pack from Stripe Checkout session
+ */
+export function getPackByPriceId(priceId: string): CreditPack | undefined {
+  // Map Price IDs to packs (must match STRIPE_PRICE_* env vars)
+  const priceMap: Record<string, PackType> = {};
+
+  // Build reverse mapping from environment variables
+  if (process.env.STRIPE_PRICE_STARTER) {
+    priceMap[process.env.STRIPE_PRICE_STARTER] = "STARTER";
+  }
+  if (process.env.STRIPE_PRICE_PRO) {
+    priceMap[process.env.STRIPE_PRICE_PRO] = "PRO";
+  }
+  if (process.env.STRIPE_PRICE_SCALE) {
+    priceMap[process.env.STRIPE_PRICE_SCALE] = "SCALE";
+  }
+
+  const packType = priceMap[priceId];
+  return packType ? CREDIT_PACKS[packType] : undefined;
+}
+
+/**
  * Feature flag for billing
  * Set to false to hide billing UI when not configured
  */

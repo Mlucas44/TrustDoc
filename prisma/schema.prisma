@@ -43,9 +43,10 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  analyses Analysis[]
-  accounts Account[] // NextAuth: OAuth accounts
-  sessions Session[] // NextAuth: active sessions
+  analyses     Analysis[]
+  creditLedger CreditLedger[]
+  accounts     Account[] // NextAuth: OAuth accounts
+  sessions     Session[] // NextAuth: active sessions
 
   @@index([email])
   @@map("users")
@@ -86,6 +87,36 @@ model Analysis {
   @@index([type])
   @@index([deletedAt])
   @@map("analyses")
+}
+
+// =============================================================================
+// Billing Models
+// =============================================================================
+
+/// Type of credit transaction
+enum CreditTransactionType {
+  PURCHASE // Credit pack purchase via Stripe
+}
+
+/// Credit transaction ledger for accounting and audit trail
+/// Tracks all credit additions/deductions with full traceability
+model CreditLedger {
+  id             String                 @id @default(cuid())
+  userId         String
+  stripeEventId  String                 @unique // Stripe event ID for idempotence
+  type           CreditTransactionType
+  credits        Int // Credits added (positive) or deducted (negative)
+  amountCents    Int // Amount in cents (990 = 9.90€)
+  currency       String                 @default("eur") // Currency code (ISO 4217)
+  pack           String // Pack type: STARTER, PRO, SCALE
+  createdAt      DateTime               @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([stripeEventId])
+  @@map("credit_ledger")
 }
 
 // =============================================================================

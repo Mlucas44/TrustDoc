@@ -880,26 +880,92 @@ Creates a Stripe Checkout Session for purchasing a credit pack.
 - `/billing/success?session_id={ID}` - Payment confirmation page
 - `/billing/cancel` - User cancelled checkout
 
-#### Webhook Integration (Next Steps)
+#### Webhook Integration
 
-⚠️ **Important**: Credits are NOT added immediately on checkout. They are added by a webhook handler when Stripe confirms the payment.
+✅ **Automatic Credit Fulfillment**: Credits are added automatically when Stripe confirms successful payment via the webhook endpoint.
 
-**To complete the integration:**
+**How It Works:**
 
-1. Implement `POST /api/billing/webhook` endpoint
-2. Listen for `payment_intent.succeeded` event
-3. Extract `userId` and `pack` from session metadata
-4. Add credits to user account via `UserRepo.addCredits()`
-5. Mark transaction as processed in database
+The webhook handler (`POST /api/billing/webhook`) processes Stripe events securely:
 
-**Setup Webhook in Stripe:**
+1. Verifies webhook signature to prevent fraud
+2. Listens for `checkout.session.completed` events
+3. Extracts `userId` and payment details from session metadata
+4. Checks idempotence (prevents double-crediting via `stripeEventId`)
+5. Creates `CreditLedger` entry and updates `User.credits` in atomic transaction
+6. Logs transaction for audit trail
 
-1. Go to Developers → Webhooks in Stripe Dashboard
+**Database Schema:**
+
+All credit transactions are recorded in the `CreditLedger` table:
+
+```prisma
+model CreditLedger {
+  id            String   @id @default(cuid())
+  userId        String
+  stripeEventId String   @unique  // Ensures idempotence
+  type          CreditTransactionType  // "PURCHASE"
+  credits       Int      // Credits added
+  amountCents   Int      // Amount paid (990 = 9.90€)
+  currency      String   // "eur"
+  pack          String   // "STARTER", "PRO", "SCALE"
+  createdAt     DateTime @default(now())
+}
+```
+
+**Idempotence Guarantee:**
+
+- Each Stripe event is processed exactly once
+- `stripeEventId` uniqueness constraint prevents duplicates
+- Safe for Stripe retries and replays
+
+**Setup Webhook in Stripe Dashboard:**
+
+1. Go to **Developers → Webhooks**
 2. Add endpoint: `https://your-domain.com/api/billing/webhook`
-3. Select event: `payment_intent.succeeded`
-4. Copy webhook signing secret to `STRIPE_WEBHOOK_SECRET`
+3. Select event: `checkout.session.completed`
+4. Copy webhook signing secret
+5. Add to `.env.local`:
+   ```bash
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
 
-📚 **Webhook implementation guide**: Coming in next release
+**Local Testing with Stripe CLI:**
+
+```bash
+# Install Stripe CLI
+# https://stripe.com/docs/stripe-cli
+
+# Login to your Stripe account
+stripe login
+
+# Forward webhooks to local server
+stripe listen --forward-to localhost:3000/api/billing/webhook
+
+# In another terminal, trigger test event
+stripe trigger checkout.session.completed
+
+# Watch your server logs for webhook processing
+```
+
+**Webhook Logs:**
+
+The webhook handler logs all activity for monitoring:
+
+```bash
+[Webhook] Received event: checkout.session.completed (evt_...)
+[Webhook] Processing checkout session: cs_test_...
+[Webhook] Resolved pack: PRO (+50 credits) for user user@example.com
+[Webhook] ✓ Successfully credited 50 credits to user@example.com (event: evt_...)
+```
+
+**Error Handling:**
+
+- **Invalid signature** → 400 (prevents fraud)
+- **Unknown price ID** → 200 (ignores event, logs warning)
+- **User not found** → 200 (dead letter, logs warning)
+- **Duplicate event** → 200 (idempotent, skips credit addition)
+- **Transaction failure** → 500 (Stripe will retry)
 
 #### Testing
 
