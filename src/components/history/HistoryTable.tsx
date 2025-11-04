@@ -7,7 +7,7 @@
  * Desktop: Full table | Mobile: Card list
  */
 
-import { FileText, Search, X } from "lucide-react";
+import { AlertTriangle, FileText, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -171,9 +171,33 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                       {formatDate(item.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/analysis/${item.id}`}>Ouvrir</Link>
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Voir les points d'attention"
+                        >
+                          <Link href={`/analysis/${item.id}#red-flags`}>
+                            <AlertTriangle className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Voir les clauses clés"
+                        >
+                          <Link href={`/analysis/${item.id}#clauses`}>
+                            <FileText className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button asChild variant="ghost" size="sm">
+                          <Link href={`/analysis/${item.id}`}>Ouvrir</Link>
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -201,9 +225,33 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                     <span className="text-xs">{formatDate(item.createdAt)}</span>
                   </div>
 
-                  <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link href={`/analysis/${item.id}`}>Ouvrir l&apos;analyse</Link>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      title="Voir les points d'attention"
+                    >
+                      <Link href={`/analysis/${item.id}#red-flags`}>
+                        <AlertTriangle className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      title="Voir les clauses clés"
+                    >
+                      <Link href={`/analysis/${item.id}#clauses`}>
+                        <FileText className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="flex-1">
+                      <Link href={`/analysis/${item.id}`}>Ouvrir l&apos;analyse</Link>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
