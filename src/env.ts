@@ -52,12 +52,18 @@ const serverSchema = z.object({
   OLLAMA_BASE_URL: z.string().url().optional(), // Optional for local LLM, defaults to http://localhost:11434/v1
   OLLAMA_MODEL: z.string().optional(), // Optional, defaults to mistral
 
-  // Stripe
-  STRIPE_SECRET_KEY: z.string().startsWith("sk_", "Invalid Stripe secret key format"),
-  STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_", "Invalid Stripe webhook secret format"),
-  STRIPE_PRICE_STARTER: z.string().startsWith("price_", "Invalid Stripe price ID format"),
-  STRIPE_PRICE_PRO: z.string().startsWith("price_", "Invalid Stripe price ID format"),
-  STRIPE_PRICE_SCALE: z.string().startsWith("price_", "Invalid Stripe price ID format"),
+  // Stripe (Optional - only required when NEXT_PUBLIC_BILLING_ENABLED is true)
+  STRIPE_SECRET_KEY: z.string().startsWith("sk_", "Invalid Stripe secret key format").optional(),
+  STRIPE_WEBHOOK_SECRET: z
+    .string()
+    .startsWith("whsec_", "Invalid Stripe webhook secret format")
+    .optional(),
+  STRIPE_PRICE_STARTER: z
+    .string()
+    .startsWith("price_", "Invalid Stripe price ID format")
+    .optional(),
+  STRIPE_PRICE_PRO: z.string().startsWith("price_", "Invalid Stripe price ID format").optional(),
+  STRIPE_PRICE_SCALE: z.string().startsWith("price_", "Invalid Stripe price ID format").optional(),
 
   // Rate Limiting
   RATE_LIMIT_WINDOW: z.coerce.number().int().positive().default(60), // seconds
@@ -84,8 +90,11 @@ const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url("Supabase URL must be valid"),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, "Supabase anon key is required"),
 
-  // Stripe
-  NEXT_PUBLIC_STRIPE_PUBLIC_KEY: z.string().startsWith("pk_", "Invalid Stripe public key format"),
+  // Stripe (Optional - only required when NEXT_PUBLIC_BILLING_ENABLED is true)
+  NEXT_PUBLIC_STRIPE_PUBLIC_KEY: z
+    .string()
+    .startsWith("pk_", "Invalid Stripe public key format")
+    .optional(),
 });
 
 // =============================================================================
