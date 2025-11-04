@@ -23,9 +23,9 @@ test.describe("Red Flags List Display", () => {
 
   test("renders red flag items with titles", async ({ page }) => {
     // Check for sample red flag titles
-    await expect(page.getByText("Unlimited Liability Clause")).toBeVisible();
-    await expect(page.getByText("Unclear Termination Conditions")).toBeVisible();
-    await expect(page.getByText("Intellectual Property Ambiguity")).toBeVisible();
+    await expect(page.getByText("Unlimited Liability Clause").first()).toBeVisible();
+    await expect(page.getByText("Unclear Termination Conditions").first()).toBeVisible();
+    await expect(page.getByText("Intellectual Property Ambiguity").first()).toBeVisible();
   });
 
   test("displays severity badges with correct labels", async ({ page }) => {
@@ -40,12 +40,14 @@ test.describe("Red Flags List Display", () => {
   });
 
   test("displays 'why' explanation text", async ({ page }) => {
-    const whyText = page.getByText(/This clause exposes you to unlimited financial liability/);
+    const whyText = page
+      .getByText(/This clause exposes you to unlimited financial liability/)
+      .first();
     await expect(whyText).toBeVisible();
   });
 
   test("displays clause excerpts in monospace format", async ({ page }) => {
-    const excerptText = page.getByText(/Section 7.3:/);
+    const excerptText = page.getByText(/Section 7.3:/).first();
     await expect(excerptText).toBeVisible();
   });
 
@@ -122,8 +124,7 @@ test.describe("Red Flags Sorting", () => {
     expect(count).toBeGreaterThan(0);
 
     // The first item should be "Unlimited Liability Clause" (high severity)
-    const firstItemTitle = articles.first().getByRole("heading");
-    await expect(firstItemTitle).toContainText("Unlimited Liability Clause");
+    await expect(articles.first()).toContainText("Unlimited Liability Clause");
   });
 });
 
@@ -205,7 +206,7 @@ test.describe("Red Flags Dark Mode", () => {
     await page.getByRole("heading", { name: "Red Flags List" }).scrollIntoViewIfNeeded();
 
     // Verify key elements are still visible
-    await expect(page.getByText("Unlimited Liability Clause")).toBeVisible();
+    await expect(page.getByText("Unlimited Liability Clause").first()).toBeVisible();
     await expect(page.getByText("High", { exact: true }).first()).toBeVisible();
 
     // Verify search and filter inputs
