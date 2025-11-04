@@ -41,18 +41,18 @@ export interface AnalyzeContractInput {
 function selectProvider(modelHint?: LLMProvider): ILLMProvider {
   // 1. Feature flag: USE_OLLAMA=true → always use Ollama
   if (env.server.USE_OLLAMA === "true") {
-    console.log("[selectProvider] USE_OLLAMA=true, using Ollama");
+    console.info("[selectProvider] USE_OLLAMA=true, using Ollama");
     return new OllamaProvider();
   }
 
   // 2. Model hint: prefer hinted provider
   if (modelHint === "ollama") {
-    console.log("[selectProvider] modelHint=ollama, using Ollama");
+    console.info("[selectProvider] modelHint=ollama, using Ollama");
     return new OllamaProvider();
   }
 
   // 3. Default: use OpenAI
-  console.log("[selectProvider] Using OpenAI (default)");
+  console.info("[selectProvider] Using OpenAI (default)");
   return new OpenAIProvider();
 }
 
@@ -116,7 +116,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
 
   // 1. Select provider
   const provider = selectProvider(modelHint);
-  console.log(`[analyzeContract] Using provider: ${provider.name}`);
+  console.info(`[analyzeContract] Using provider: ${provider.name}`);
 
   // 2. Build prompts
   const systemPrompt = getSystemPrompt();
@@ -134,7 +134,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
     });
 
     rawOutput = response.content;
-    console.log(
+    console.info(
       `[analyzeContract] Initial call: ${response.content.length} chars, ${response.tokensUsed || "?"} tokens`
     );
   } catch (error) {
@@ -149,7 +149,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
 
   if (validation.success && validation.data) {
     const duration = performance.now() - startTime;
-    console.log(
+    console.info(
       `[analyzeContract] Success on first attempt (${duration.toFixed(2)}ms) - provider: ${provider.name}, retries: ${retryCount}`
     );
     return validation.data;
@@ -174,7 +174,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
       });
 
       rawOutput = response.content;
-      console.log(
+      console.info(
         `[analyzeContract] Repair attempt ${attempt}: ${response.content.length} chars, ${response.tokensUsed || "?"} tokens`
       );
     } catch (error) {
@@ -190,7 +190,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
 
     if (validation.success && validation.data) {
       const duration = performance.now() - startTime;
-      console.log(
+      console.info(
         `[analyzeContract] Success after ${retryCount} repair attempts (${duration.toFixed(2)}ms) - provider: ${provider.name}`
       );
       return validation.data;

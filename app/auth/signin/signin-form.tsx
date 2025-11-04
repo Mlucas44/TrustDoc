@@ -34,7 +34,7 @@ export function SignInForm() {
       setIsGoogleLoading(true);
       setError(null);
       await signIn("google", { callbackUrl: "/dashboard" });
-    } catch (err) {
+    } catch {
       setError("Une erreur est survenue lors de la connexion avec Google");
       setIsGoogleLoading(false);
     }
@@ -68,7 +68,7 @@ export function SignInForm() {
         setEmailSent(true);
         setIsLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError("Une erreur est survenue");
       setIsLoading(false);
     }

@@ -12,7 +12,7 @@ import { test } from "@playwright/test";
 
 test.describe("Credits Guard Middleware", () => {
   test.describe("POST /api/analyze", () => {
-    test("returns 402 when user has 0 credits", async ({ request }) => {
+    test("returns 402 when user has 0 credits", async ({ request: _request }) => {
       // This test requires a seeded user with 0 credits
       // In a real scenario, you would:
       // 1. Create a test user with 0 credits
@@ -23,7 +23,7 @@ test.describe("Credits Guard Middleware", () => {
       test.skip(true, "Requires authenticated test user setup");
     });
 
-    test("returns 402 when guest quota is exceeded", async ({ request }) => {
+    test("returns 402 when guest quota is exceeded", async ({ request: _request }) => {
       // This test requires:
       // 1. A guest ID that has exhausted its quota (3 analyses)
       // 2. Set appropriate cookies
@@ -33,7 +33,7 @@ test.describe("Credits Guard Middleware", () => {
       test.skip(true, "Requires guest quota test setup");
     });
 
-    test("allows request when user has sufficient credits", async ({ request }) => {
+    test("allows request when user has sufficient credits", async ({ request: _request }) => {
       // This test requires:
       // 1. Create a test user with credits > 0
       // 2. Authenticate as that user
@@ -43,7 +43,7 @@ test.describe("Credits Guard Middleware", () => {
       test.skip(true, "Requires authenticated test user setup");
     });
 
-    test("allows request for guest with available quota", async ({ request }) => {
+    test("allows request for guest with available quota", async ({ request: _request }) => {
       // This test requires:
       // 1. Fresh guest ID with quota < 3
       // 2. Make request to /api/analyze
@@ -54,7 +54,7 @@ test.describe("Credits Guard Middleware", () => {
   });
 
   test.describe("Credits Guard Error Responses", () => {
-    test("402 response includes error code and message", async ({ request }) => {
+    test("402 response includes error code and message", async ({ request: _request }) => {
       // When guard blocks a request, verify response structure:
       // {
       //   error: "Insufficient credits...",
@@ -64,7 +64,7 @@ test.describe("Credits Guard Middleware", () => {
       test.skip(true, "Requires authenticated test user setup");
     });
 
-    test("402 response does NOT execute expensive operations", async ({ request }) => {
+    test("402 response does NOT execute expensive operations", async ({ request: _request }) => {
       // Verify that when guard blocks:
       // - No LLM calls are made
       // - No PDF parsing occurs
@@ -80,17 +80,17 @@ test.describe("Credits Guard Middleware", () => {
   });
 
   test.describe("Multiple Protected Endpoints", () => {
-    test("/api/upload respects credits guard", async ({ request }) => {
+    test("/api/upload respects credits guard", async ({ request: _request }) => {
       // Verify that /api/upload also blocks when credits = 0
       test.skip(true, "Requires authenticated test user setup");
     });
 
-    test("/api/parse respects credits guard", async ({ request }) => {
+    test("/api/parse respects credits guard", async ({ request: _request }) => {
       // Verify that /api/parse also blocks when credits = 0
       test.skip(true, "Requires authenticated test user setup");
     });
 
-    test("/api/prepare respects credits guard", async ({ request }) => {
+    test("/api/prepare respects credits guard", async ({ request: _request }) => {
       // Verify that /api/prepare also blocks when credits = 0
       test.skip(true, "Requires authenticated test user setup");
     });
@@ -98,14 +98,14 @@ test.describe("Credits Guard Middleware", () => {
 });
 
 test.describe("toJsonError Utility", () => {
-  test("maps InsufficientCreditsError to 402", async ({ request }) => {
+  test("maps InsufficientCreditsError to 402", async ({ request: _request }) => {
     // Test httpErrors.ts utility by making a request that triggers
     // InsufficientCreditsError and verifying the response
 
     test.skip(true, "Requires authenticated test user setup");
   });
 
-  test("response includes details for InsufficientCreditsError", async ({ request }) => {
+  test("response includes details for InsufficientCreditsError", async ({ request: _request }) => {
     // Verify that 402 response includes:
     // {
     //   error: string,

@@ -89,7 +89,7 @@ export async function detectContractType(textClean: string): Promise<DetectionRe
   // 2. If heuristic is very confident (≥ 0.8), return immediately
   if (heuristicResult.confidence >= 0.8) {
     const duration = performance.now() - startTime;
-    console.log(
+    console.info(
       `[detectContractType] Using heuristic only: ${heuristicResult.type} (confidence: ${heuristicResult.confidence.toFixed(2)}, ${duration.toFixed(2)}ms)`
     );
 
@@ -123,7 +123,7 @@ export async function detectContractType(textClean: string): Promise<DetectionRe
 
     // 5. If LLM is very confident (≥ 0.7), trust it
     if (llmResult.confidence >= 0.7) {
-      console.log(
+      console.info(
         `[detectContractType] Using LLM: ${llmResult.type} (confidence: ${llmResult.confidence.toFixed(2)}, ${duration.toFixed(2)}ms)`
       );
 
@@ -142,7 +142,7 @@ export async function detectContractType(textClean: string): Promise<DetectionRe
     if (heuristicResult.type === llmResult.type) {
       const combinedConfidence = heuristicResult.confidence * 0.4 + llmResult.confidence * 0.6;
 
-      console.log(
+      console.info(
         `[detectContractType] Hybrid (agreement): ${heuristicResult.type} (confidence: ${combinedConfidence.toFixed(2)}, ${duration.toFixed(2)}ms)`
       );
 
@@ -159,7 +159,7 @@ export async function detectContractType(textClean: string): Promise<DetectionRe
         heuristicResult.confidence >= llmResult.confidence ? heuristicResult.type : llmResult.type;
       const finalConfidence = Math.max(heuristicResult.confidence, llmResult.confidence);
 
-      console.log(
+      console.info(
         `[detectContractType] Hybrid (disagreement): ${finalType} (confidence: ${finalConfidence.toFixed(2)}, ${duration.toFixed(2)}ms)`
       );
 

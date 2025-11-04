@@ -19,16 +19,15 @@
  *   SEED_DETERMINISTIC=true pnpm db:seed  # Reproducible data
  */
 
-import { config } from "dotenv";
-
 import { resolve } from "path";
+
+import { faker } from "@faker-js/faker";
+import { ContractType, PrismaClient } from "@prisma/client";
+import { config } from "dotenv";
 
 // Load environment variables (.env.local takes precedence over .env)
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
-
-import { faker } from "@faker-js/faker";
-import { PrismaClient, ContractType } from "@prisma/client";
 
 import { makeAnalysis } from "./factories";
 
@@ -157,10 +156,13 @@ async function seedAnalyses(userId: string) {
   return analyses;
 }
 
+type User = { id: string; email: string; credits: number };
+type Analysis = { id: string; type: ContractType; riskScore: number };
+
 /**
  * Display summary statistics
  */
-function displaySummary(users: any[], analyses: any[]) {
+function displaySummary(users: User[], analyses: Analysis[]) {
   const riskScores = analyses.map((a) => a.riskScore);
   const minRisk = Math.min(...riskScores);
   const maxRisk = Math.max(...riskScores);
@@ -213,8 +215,8 @@ async function main() {
     await purgeDatabase();
   }
 
-  let users: any[] = [];
-  let analyses: any[] = [];
+  let users: User[] = [];
+  let analyses: Analysis[] = [];
 
   // Seed users
   if (!onlyFlag || onlyFlag === "users") {

@@ -92,7 +92,7 @@ export async function requireQuotaOrUserCredit(route?: string): Promise<QuotaChe
 
     const duration = performance.now() - startTime;
     if (process.env.NODE_ENV === "development") {
-      console.log(`[requireQuotaOrUserCredit] Quota check passed`, {
+      console.info(`[requireQuotaOrUserCredit] Quota check passed`, {
         userId: user.id,
         credits: user.credits,
         route: route || "unknown",
@@ -114,7 +114,7 @@ export async function requireQuotaOrUserCredit(route?: string): Promise<QuotaChe
 
     const duration = performance.now() - startTime;
     if (process.env.NODE_ENV === "development") {
-      console.log(`[requireQuotaOrUserCredit] Guest quota check passed`, {
+      console.info(`[requireQuotaOrUserCredit] Guest quota check passed`, {
         guestId,
         route: route || "unknown",
         duration: `${duration.toFixed(2)}ms`,

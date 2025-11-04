@@ -9,15 +9,14 @@
  * Usage: pnpm db:truncate
  */
 
-import { config } from "dotenv";
-
 import { resolve } from "path";
+
+import { PrismaClient } from "@prisma/client";
+import { config } from "dotenv";
 
 // Load environment variables (.env.local takes precedence)
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
-
-import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 

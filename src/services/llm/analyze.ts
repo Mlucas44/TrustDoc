@@ -133,7 +133,7 @@ export async function callAnalysisLLM(
   const systemPrompt = getSystemPrompt();
   const userPrompt = analysisPrompt(contractType, textClean);
 
-  console.log(
+  console.info(
     `[callAnalysisLLM] Starting analysis for ${contractType} (${textClean.length} chars, ${USE_OLLAMA ? "Ollama" : "OpenAI"})`
   );
 
@@ -144,7 +144,7 @@ export async function callAnalysisLLM(
   // 2. If valid, return immediately
   if (validation.success && validation.data) {
     const duration = performance.now() - startTime;
-    console.log(
+    console.info(
       `[callAnalysisLLM] Success on first try (${duration.toFixed(2)}ms, risk: ${validation.data.riskScore})`
     );
     return validation.data;
@@ -164,7 +164,7 @@ export async function callAnalysisLLM(
 
     if (validation.success && validation.data) {
       const duration = performance.now() - startTime;
-      console.log(
+      console.info(
         `[callAnalysisLLM] Success after ${attempt} repair(s) (${duration.toFixed(2)}ms, risk: ${validation.data.riskScore})`
       );
       return validation.data;

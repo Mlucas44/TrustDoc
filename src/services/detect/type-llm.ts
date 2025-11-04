@@ -153,7 +153,7 @@ export async function detectTypeLLM(text: string, hint?: ContractType): Promise<
     const validated = LLMResultSchema.parse(parsed);
 
     const duration = performance.now() - startTime;
-    console.log(
+    console.info(
       `[detectTypeLLM] Detected ${validated.type} with confidence ${validated.confidence.toFixed(2)} (${duration.toFixed(2)}ms)`
     );
 

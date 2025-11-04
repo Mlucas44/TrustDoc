@@ -69,7 +69,7 @@ export function RedFlagItem({ flag, className }: RedFlagItemProps) {
         title: "Copied to clipboard",
         description: "Clause excerpt has been copied successfully.",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Copy failed",
         description: "Failed to copy clause excerpt. Please try again.",

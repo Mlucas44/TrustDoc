@@ -240,7 +240,7 @@ export function detectTypeHeuristic(text: string): HeuristicResult {
   const titleType = detectFromTitle(normalizedText);
   if (titleType.confidence >= 0.9) {
     const duration = performance.now() - startTime;
-    console.log(
+    console.info(
       `[detectTypeHeuristic] Title detection: ${titleType.type} (${duration.toFixed(2)}ms)`
     );
     const evidence = extractEvidence(normalizedText, titleType.type, text);
@@ -303,7 +303,7 @@ export function detectTypeHeuristic(text: string): HeuristicResult {
   const evidence = extractEvidence(normalizedText, bestType, text);
 
   const duration = performance.now() - startTime;
-  console.log(
+  console.info(
     `[detectTypeHeuristic] Detected ${bestType} with confidence ${bestScore.toFixed(2)} (${duration.toFixed(2)}ms)`
   );
 

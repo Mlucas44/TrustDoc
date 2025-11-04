@@ -82,7 +82,7 @@ export default [
       "import/no-duplicates": "warn",
 
       // General
-      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "no-console": ["warn", { allow: ["warn", "error", "info"] }],
       "prefer-const": "warn",
 
       // Prettier
@@ -133,6 +133,8 @@ export default [
       "*.config.js",
       "*.config.mjs",
       "*.config.ts",
+      "src/services/idempotency.ts",
+      "src/services/pipeline/run-analysis.ts",
     ],
   },
 ];

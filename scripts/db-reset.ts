@@ -11,16 +11,15 @@
  * Usage: pnpm db:reset
  */
 
-import { config } from "dotenv";
-
+import { exec } from "child_process";
 import { resolve } from "path";
+import { promisify } from "util";
+
+import { config } from "dotenv";
 
 // Load environment variables (.env.local takes precedence)
 config({ path: resolve(process.cwd(), ".env.local") });
 config({ path: resolve(process.cwd(), ".env") });
-
-import { exec } from "child_process";
-import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -61,8 +60,11 @@ async function runCommand(command: string, description: string) {
     const { stdout, stderr } = await execAsync(command);
     if (stdout) console.log(stdout);
     if (stderr) console.error(stderr);
-  } catch (error: any) {
-    console.error(`❌ ${description} failed:`, error.message);
+  } catch (error) {
+    console.error(
+      `❌ ${description} failed:`,
+      error instanceof Error ? error.message : String(error)
+    );
     throw error;
   }
 }
