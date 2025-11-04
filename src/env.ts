@@ -55,6 +55,9 @@ const serverSchema = z.object({
   // Stripe
   STRIPE_SECRET_KEY: z.string().startsWith("sk_", "Invalid Stripe secret key format"),
   STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_", "Invalid Stripe webhook secret format"),
+  STRIPE_PRICE_STARTER: z.string().startsWith("price_", "Invalid Stripe price ID format"),
+  STRIPE_PRICE_PRO: z.string().startsWith("price_", "Invalid Stripe price ID format"),
+  STRIPE_PRICE_SCALE: z.string().startsWith("price_", "Invalid Stripe price ID format"),
 
   // Rate Limiting
   RATE_LIMIT_WINDOW: z.coerce.number().int().positive().default(60), // seconds

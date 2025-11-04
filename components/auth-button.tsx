@@ -15,7 +15,7 @@
  * ```
  */
 
-import { LogOut, User, CreditCard } from "lucide-react";
+import { LogOut, User, Coins } from "lucide-react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 
@@ -80,9 +80,9 @@ export function AuthButton() {
 
         {/* Credits */}
         <DropdownMenuItem asChild>
-          <Link href="/dashboard/credits" className="flex cursor-pointer items-center">
-            <CreditCard className="mr-2 h-4 w-4" />
-            <span>Crédits: {session.user.credits}</span>
+          <Link href="/credits" className="flex cursor-pointer items-center">
+            <Coins className="mr-2 h-4 w-4" />
+            <span>Mes crédits ({session.user.credits})</span>
           </Link>
         </DropdownMenuItem>
 

@@ -766,6 +766,167 @@ After migration:
 2. Update `/api/analyze` to use `runAnalysis()` pipeline
 3. Client sends `idempotencyKey` with each request
 
+### Stripe Checkout (Credit Packs Purchase)
+
+TrustDoc allows authenticated users to purchase credit packs via Stripe Checkout. This provides a secure, reliable payment experience with automatic credit fulfillment via webhooks.
+
+#### Available Credit Packs
+
+| Pack    | Credits | Price    | Description                   |
+| ------- | ------- | -------- | ----------------------------- |
+| STARTER | 10      | 9,90 €   | Ideal for testing the service |
+| PRO     | 50      | 39,00 €  | For regular usage             |
+| SCALE   | 200     | 129,00 € | For high volume               |
+
+#### Configuration
+
+**1. Create Stripe Products & Prices**
+
+In your Stripe Dashboard:
+
+1. Create 3 products: "Pack Starter", "Pack Pro", "Pack Scale"
+2. Create a Price for each product with the amounts above
+3. Copy the Price IDs (format: `price_...`)
+
+**2. Add Environment Variables**
+
+```bash
+# .env.local
+NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_test_...  # Client-safe publishable key
+STRIPE_SECRET_KEY=sk_test_...              # Server-only secret key
+STRIPE_WEBHOOK_SECRET=whsec_...            # Webhook signature secret
+STRIPE_PRICE_STARTER=price_...             # Price ID for Starter pack
+STRIPE_PRICE_PRO=price_...                 # Price ID for Pro pack
+STRIPE_PRICE_SCALE=price_...               # Price ID for Scale pack
+```
+
+**3. Test the Checkout Flow**
+
+```bash
+# Start dev server
+pnpm dev
+
+# Navigate to http://localhost:3000/credits
+# Sign in and click "Acheter" on any pack
+# You'll be redirected to Stripe Checkout
+```
+
+#### How It Works
+
+**Purchase Flow:**
+
+```
+User clicks "Acheter"
+  ↓
+POST /api/billing/checkout { pack: "STARTER" }
+  ↓
+Server creates Stripe Checkout Session
+  ↓
+User redirected to Stripe Checkout
+  ↓
+User completes payment
+  ↓
+Stripe webhook triggered (payment_intent.succeeded)
+  ↓
+Credits added to user account
+  ↓
+User redirected to /billing/success
+```
+
+**Security:**
+
+- ✅ Authentication required (guests rejected with 401)
+- ✅ Server-only secret keys (never exposed to client)
+- ✅ Stripe session metadata includes userId and pack
+- ✅ Webhook signature verification (prevents tampering)
+- ✅ Credits added only after successful payment confirmation
+
+**Client-Side:**
+
+```tsx
+import { CreditPacksGrid } from "@/src/components/credits/CreditPacksGrid";
+import { CreditsBalance } from "@/src/components/credits/CreditsBalance";
+
+<CreditsBalance />  // Shows current credit balance
+<CreditPacksGrid />  // Shows purchase options with "Acheter" buttons
+```
+
+#### API Endpoints
+
+**POST `/api/billing/checkout`**
+
+Creates a Stripe Checkout Session for purchasing a credit pack.
+
+```typescript
+// Request
+{
+  pack: "STARTER" | "PRO" | "SCALE"
+}
+
+// Success (200)
+{
+  url: "https://checkout.stripe.com/c/pay/cs_test_..."
+}
+
+// Errors
+401 Unauthorized - User not authenticated
+400 Bad Request - Invalid pack type
+500 Internal Server Error - Stripe API error
+```
+
+**Pages:**
+
+- `/credits` - View balance and purchase packs
+- `/billing/success?session_id={ID}` - Payment confirmation page
+- `/billing/cancel` - User cancelled checkout
+
+#### Webhook Integration (Next Steps)
+
+⚠️ **Important**: Credits are NOT added immediately on checkout. They are added by a webhook handler when Stripe confirms the payment.
+
+**To complete the integration:**
+
+1. Implement `POST /api/billing/webhook` endpoint
+2. Listen for `payment_intent.succeeded` event
+3. Extract `userId` and `pack` from session metadata
+4. Add credits to user account via `UserRepo.addCredits()`
+5. Mark transaction as processed in database
+
+**Setup Webhook in Stripe:**
+
+1. Go to Developers → Webhooks in Stripe Dashboard
+2. Add endpoint: `https://your-domain.com/api/billing/webhook`
+3. Select event: `payment_intent.succeeded`
+4. Copy webhook signing secret to `STRIPE_WEBHOOK_SECRET`
+
+📚 **Webhook implementation guide**: Coming in next release
+
+#### Testing
+
+**Test Cards:**
+
+Use Stripe's test cards in Checkout:
+
+- Success: `4242 4242 4242 4242`
+- Decline: `4000 0000 0000 0002`
+- Any future expiry date, any CVC
+
+**Test Mode:**
+
+All endpoints work with Stripe test keys (`pk_test_...`, `sk_test_...`). No real charges occur.
+
+#### Feature Flag
+
+The billing UI is automatically hidden when Stripe is not configured:
+
+```typescript
+// src/constants/billing.ts
+export const BILLING_ENABLED =
+  process.env.STRIPE_SECRET_KEY !== undefined && process.env.STRIPE_PUBLIC_KEY !== undefined;
+```
+
+If Stripe keys are missing, the credits page will show a message: "Billing not available in this environment."
+
 ### File Upload (Secure PDF Storage)
 
 TrustDoc provides secure, temporary file upload to Supabase Storage for PDF contract analysis.
