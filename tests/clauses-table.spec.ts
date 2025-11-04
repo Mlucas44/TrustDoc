@@ -24,9 +24,9 @@ test.describe("Clauses Table Display", () => {
 
   test("renders clause types", async ({ page }) => {
     // Check for sample clause types
-    await expect(page.getByText("Parties")).toBeVisible();
-    await expect(page.getByText("Durée")).toBeVisible();
-    await expect(page.getByText("Résiliation")).toBeVisible();
+    await expect(page.getByText("Parties").first()).toBeVisible();
+    await expect(page.getByText("Durée").first()).toBeVisible();
+    await expect(page.getByText("Résiliation").first()).toBeVisible();
   });
 
   test("displays category badges", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("Clauses Table Display", () => {
 
   test("shows clause previews", async ({ page }) => {
     // Preview text should be visible
-    const preview = page.getByText(/Article 1 - Parties/);
+    const preview = page.getByText(/Article 1 - Parties/).first();
     await expect(preview).toBeVisible();
   });
 
@@ -290,7 +290,7 @@ test.describe("Clauses Dark Mode", () => {
     await page.getByRole("heading", { name: "Clauses clés" }).scrollIntoViewIfNeeded();
 
     // Verify key elements are still visible
-    await expect(page.getByText("Parties")).toBeVisible();
+    await expect(page.getByText("Parties").first()).toBeVisible();
 
     // Search input should be visible
     const searchInput = page.getByRole("searchbox").first();

@@ -22,12 +22,12 @@ test.describe("Export Buttons Display", () => {
   });
 
   test("renders JSON export button", async ({ page }) => {
-    const jsonButton = page.getByRole("button", { name: /Exporter JSON/i });
+    const jsonButton = page.getByRole("button", { name: /Exporter JSON/i }).first();
     await expect(jsonButton).toBeVisible();
   });
 
   test("renders Markdown export button", async ({ page }) => {
-    const mdButton = page.getByRole("button", { name: /Exporter Markdown/i });
+    const mdButton = page.getByRole("button", { name: /Exporter Markdown/i }).first();
     await expect(mdButton).toBeVisible();
   });
 
@@ -202,23 +202,22 @@ test.describe("Export Data Structure", () => {
       id: "db-123",
       filename: "contract.pdf",
       createdAt: new Date("2025-01-15T10:00:00Z"),
-      typeContrat: "Service Agreement",
+      type: "Service Agreement",
       riskScore: 75,
-      riskJustification: "High risk detected",
       summary: "Contract summary",
-      redFlagsJson: JSON.stringify([
+      redFlags: [
         {
           category: "Liability",
           description: "Unlimited liability",
           severity: 3,
         },
-      ]),
-      clausesJson: JSON.stringify([
+      ],
+      clauses: [
         {
           type: "Termination",
           text: "30 days notice required",
         },
-      ]),
+      ],
     };
 
     const exportData = toExportAnalysis(dbAnalysis);
@@ -227,7 +226,7 @@ test.describe("Export Data Structure", () => {
     expect(exportData.filename).toBe("contract.pdf");
     expect(exportData.typeContrat).toBe("Service Agreement");
     expect(exportData.riskScore).toBe(75);
-    expect(exportData.riskJustification).toBe("High risk detected");
+    expect(exportData.riskJustification).toBe("");
     expect(exportData.summary).toBe("Contract summary");
     expect(exportData.version).toBe(EXPORT_VERSION);
 
@@ -246,16 +245,16 @@ test.describe("Export Data Structure", () => {
       id: "db-456",
       filename: "empty.pdf",
       createdAt: new Date("2025-01-15T10:00:00Z"),
-      typeContrat: "Unknown",
+      type: null,
       riskScore: 0,
-      riskJustification: null,
       summary: null,
-      redFlagsJson: null,
-      clausesJson: null,
+      redFlags: null,
+      clauses: null,
     };
 
     const exportData = toExportAnalysis(dbAnalysis);
 
+    expect(exportData.typeContrat).toBe("Non spécifié");
     expect(exportData.riskJustification).toBe("");
     expect(exportData.summary).toBe("");
     expect(exportData.redFlags).toEqual([]);
@@ -270,12 +269,11 @@ test.describe("Export Data Structure", () => {
       id: "db-789",
       filename: "invalid.pdf",
       createdAt: new Date("2025-01-15T10:00:00Z"),
-      typeContrat: "Test",
+      type: "Test",
       riskScore: 50,
-      riskJustification: "Test",
       summary: "Test",
-      redFlagsJson: "INVALID JSON {",
-      clausesJson: "{ bad json",
+      redFlags: "INVALID JSON {",
+      clauses: "{ bad json",
     };
 
     const exportData = toExportAnalysis(dbAnalysis);
