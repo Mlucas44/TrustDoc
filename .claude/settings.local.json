@@ -16,7 +16,8 @@
       "Bash(git push:*)",
       "Bash(pnpm lint:fix:*)",
       "Bash(pnpm list:*)",
-      "Bash(pnpm prisma migrate:*)"
+      "Bash(pnpm prisma migrate:*)",
+      "Bash(pnpm eslint:*)"
     ],
     "deny": [],
     "ask": []

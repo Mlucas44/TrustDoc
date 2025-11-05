@@ -17,6 +17,7 @@ import { ExportButtons } from "@/src/components/analysis/ExportButtons";
 import { RedFlagList } from "@/src/components/analysis/RedFlagList";
 import { RiskGauge } from "@/src/components/analysis/RiskGauge";
 import { RiskScoreBadge } from "@/src/components/analysis/RiskScoreBadge";
+import { DisclaimerBanner } from "@/src/components/legal/DisclaimerBanner";
 import { toUiClause } from "@/src/lib/clause-utils";
 import { toUiRedFlag } from "@/src/lib/red-flag-utils";
 import { type AnalysisTab, getActiveTabFromUrl, getTabHash } from "@/src/lib/tab-utils";
@@ -159,6 +160,7 @@ export function AnalysisDetailClient({
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6" tabIndex={-1}>
+          <DisclaimerBanner variant="inline" locale="fr" dismissible={true} />
           <RiskGauge score={analysis.riskScore} />
 
           {/* Quick stats */}

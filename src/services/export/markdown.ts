@@ -139,7 +139,7 @@ export function generateMarkdown(analysis: ExportAnalysis): string {
   lines.push("*Document généré par TrustDoc - Plateforme d'analyse contractuelle*");
   lines.push("");
   lines.push(
-    "**Avertissement:** Cette analyse est fournie à titre informatif uniquement et ne constitue pas un avis juridique. Consultez un professionnel du droit pour toute question spécifique."
+    "**⚖️ Avertissement légal:** TrustDoc est un outil d'assistance. Les résultats fournis ne constituent pas un avis juridique. Pour toute décision, consultez un professionnel du droit."
   );
   lines.push("");
 
