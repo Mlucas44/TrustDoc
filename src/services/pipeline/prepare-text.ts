@@ -7,6 +7,7 @@
 
 import "server-only";
 
+import { type Trace } from "@/src/lib/timing";
 import { detectContractType } from "@/src/services/detect/contract-type";
 import { parsePdfFromStorageWithTimeout } from "@/src/services/pdf/parse-pdf";
 import { normalizeContractText } from "@/src/services/text/normalize";
@@ -70,6 +71,8 @@ export interface PreparedTextPayload {
  *
  * @param filePath - Path to PDF in storage (e.g., "user-abc123/file.pdf")
  * @param timeoutMs - Parsing timeout (default: 20000ms)
+ * @param detectType - Whether to detect contract type (default: true)
+ * @param trace - Optional trace instance for performance monitoring
  * @returns Prepared text payload ready for AI analysis
  *
  * @throws {StorageUploadError} If file not found
@@ -89,9 +92,11 @@ export interface PreparedTextPayload {
 export async function prepareTextFromStorage(
   filePath: string,
   timeoutMs = 20000,
-  detectType = true
+  detectType = true,
+  trace?: Trace
 ): Promise<PreparedTextPayload> {
   // 1. Parse PDF (errors are thrown directly)
+  const endPrepare = trace?.start("prepare", { filePath });
   const pdfData = await parsePdfFromStorageWithTimeout(filePath, timeoutMs);
 
   // 2. Normalize text
@@ -100,13 +105,17 @@ export async function prepareTextFromStorage(
     pages: pdfData.pages,
     meta: pdfData.meta as Record<string, string>,
   });
+  endPrepare?.();
 
   // 3. Detect contract type (optional, can be disabled for performance)
   let contractTypeResult: DetectionResult | undefined;
   if (detectType) {
+    const endDetect = trace?.start("detect_type");
     try {
       contractTypeResult = await detectContractType(normalizeResult.textClean);
+      endDetect?.();
     } catch (error) {
+      endDetect?.();
       console.error("[prepareTextFromStorage] Contract type detection failed:", error);
       // Don't fail the whole pipeline if detection fails
       contractTypeResult = undefined;

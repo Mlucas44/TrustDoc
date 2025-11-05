@@ -12,6 +12,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { logAnalysisPrepared, logAnalysisFailed } from "@/src/lib/logger-events";
+import { Trace } from "@/src/lib/timing";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { getRequestId } from "@/src/middleware/request-id";
@@ -56,6 +57,7 @@ function validateFilePath(filePath: string): boolean {
 export async function POST(request: NextRequest) {
   const t0 = performance.now();
   const requestId = getRequestId(request);
+  const trace = new Trace(requestId);
 
   try {
     // 1. Check rate limit FIRST (before any processing)
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
     // 5. Prepare text (parse + normalize) with timeout
     let preparedText;
     try {
-      preparedText = await prepareTextFromStorage(filePath, 20000);
+      preparedText = await prepareTextFromStorage(filePath, 20000, true, trace);
 
       // Debug mode: write raw and clean text to files
       if (process.env.TEXT_DEBUG === "1") {
@@ -283,9 +285,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Delete source file after successful preparation
+    const endCleanup = trace.start("cleanup");
     try {
       await deleteFile(filePath);
+      endCleanup();
     } catch (error) {
+      endCleanup();
       // Log but don't fail the request if deletion fails
       console.error("[POST /api/prepare] Failed to delete source file:", error);
     }
@@ -301,6 +306,15 @@ export async function POST(request: NextRequest) {
     });
 
     // 8. Return success response (including contract type if detected)
+    // Add debug headers in development mode
+    const responseHeaders = new Headers();
+    if (process.env.NODE_ENV === "development") {
+      const headers = trace.toHeaders("x-td-latency-");
+      Object.entries(headers).forEach(([key, value]) => {
+        responseHeaders.set(key, value);
+      });
+    }
+
     return NextResponse.json(
       {
         textClean: preparedText.textClean,
@@ -310,7 +324,7 @@ export async function POST(request: NextRequest) {
         sections: preparedText.sections,
         contractType: preparedText.contractType,
       },
-      { status: 200 }
+      { status: 200, headers: responseHeaders }
     );
   } catch (error) {
     // Catch-all error handler

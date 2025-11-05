@@ -8,6 +8,7 @@
 import "server-only";
 
 import { env } from "@/src/env";
+import { type Trace } from "@/src/lib/timing";
 import { AnalysisInvalidError, AnalysisSchema } from "@/src/schemas/analysis";
 
 import { analysisPrompt, getSystemPrompt, repairPrompt } from "./prompts";
@@ -30,6 +31,7 @@ export interface AnalyzeContractInput {
   textClean: string;
   contractType: ContractType;
   modelHint?: LLMProvider;
+  trace?: Trace;
 }
 
 /**
@@ -111,7 +113,7 @@ function parseAndValidate(rawOutput: string): {
  * ```
  */
 export async function analyzeContract(input: AnalyzeContractInput): Promise<AnalysisResult> {
-  const { textClean, contractType, modelHint } = input;
+  const { textClean, contractType, modelHint, trace } = input;
   const startTime = performance.now();
 
   // 1. Select provider
@@ -126,6 +128,8 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
   let retryCount = 0;
   let rawOutput: string;
 
+  const endLLM = trace?.start("llm_analyze", { provider: provider.name, contractType });
+
   try {
     const response = await provider.call({
       systemPrompt,
@@ -139,6 +143,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
     );
   } catch (error) {
     // Provider errors (rate limit, transient, unavailable) bubble up
+    endLLM?.();
     const duration = performance.now() - startTime;
     console.error(`[analyzeContract] Provider call failed after ${duration.toFixed(2)}ms:`, error);
     throw error;
@@ -148,6 +153,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
   let validation = parseAndValidate(rawOutput);
 
   if (validation.success && validation.data) {
+    endLLM?.();
     const duration = performance.now() - startTime;
     console.info(
       `[analyzeContract] Success on first attempt (${duration.toFixed(2)}ms) - provider: ${provider.name}, retries: ${retryCount}`
@@ -189,6 +195,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
     validation = parseAndValidate(rawOutput);
 
     if (validation.success && validation.data) {
+      endLLM?.();
       const duration = performance.now() - startTime;
       console.info(
         `[analyzeContract] Success after ${retryCount} repair attempts (${duration.toFixed(2)}ms) - provider: ${provider.name}`
@@ -203,6 +210,7 @@ export async function analyzeContract(input: AnalyzeContractInput): Promise<Anal
   }
 
   // 6. Max retries exceeded - throw error
+  endLLM?.();
   const duration = performance.now() - startTime;
   console.error(
     `[analyzeContract] Failed after ${retryCount} repair attempts (${duration.toFixed(2)}ms) - provider: ${provider.name}`

@@ -16,6 +16,7 @@ import {
   logAnalysisCompleted,
   logAnalysisFailed,
 } from "@/src/lib/logger-events";
+import { Trace } from "@/src/lib/timing";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { getRequestId } from "@/src/middleware/request-id";
@@ -50,6 +51,7 @@ export const maxDuration = 60; // 60 seconds for LLM analysis
 export async function POST(request: NextRequest) {
   const t0 = performance.now();
   const requestId = getRequestId(request);
+  const trace = new Trace(requestId);
 
   try {
     // 1. Check rate limit FIRST (before any processing)
@@ -223,6 +225,7 @@ export async function POST(request: NextRequest) {
       analysis = await analyzeContract({
         textClean,
         contractType: contractTypeValidation.data,
+        trace,
         // modelHint can be added here if needed (e.g., from query params)
       });
     } catch (error) {
@@ -324,11 +327,20 @@ export async function POST(request: NextRequest) {
     });
 
     // 8. Return success response
+    // Add debug headers in development mode
+    const responseHeaders = new Headers();
+    if (process.env.NODE_ENV === "development") {
+      const headers = trace.toHeaders("x-td-latency-");
+      Object.entries(headers).forEach(([key, value]) => {
+        responseHeaders.set(key, value);
+      });
+    }
+
     return NextResponse.json(
       {
         analysis,
       },
-      { status: 200 }
+      { status: 200, headers: responseHeaders }
     );
   } catch (error) {
     // Catch-all error handler
