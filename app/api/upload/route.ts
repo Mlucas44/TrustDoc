@@ -13,7 +13,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { getSession } from "@/src/auth/session";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
-import { checkRateLimit } from "@/src/middleware/rate-limit";
+import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { getOrCreateGuestId } from "@/src/services/guest-quota";
 import {
   uploadFile,
@@ -24,15 +24,6 @@ import {
 } from "@/src/services/storage";
 
 export const runtime = "nodejs";
-
-/**
- * Rate limit configuration for uploads
- * 5 uploads per minute per IP
- */
-const UPLOAD_RATE_LIMIT = {
-  maxRequests: 5,
-  windowMs: 60 * 1000, // 1 minute
-};
 
 /**
  * POST /api/upload
@@ -54,9 +45,9 @@ const UPLOAD_RATE_LIMIT = {
 export async function POST(request: NextRequest) {
   try {
     // 1. Check rate limit FIRST (before any processing)
-    const rateLimit = checkRateLimit(request, UPLOAD_RATE_LIMIT);
+    const rateLimit = checkRateLimitForRoute(request, "/api/upload");
 
-    if (!rateLimit.allowed) {
+    if (rateLimit && !rateLimit.allowed) {
       return NextResponse.json(
         {
           error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
@@ -65,11 +56,7 @@ export async function POST(request: NextRequest) {
         },
         {
           status: 429,
-          headers: {
-            "X-RateLimit-Limit": rateLimit.limit.toString(),
-            "X-RateLimit-Remaining": rateLimit.remaining.toString(),
-            "X-RateLimit-Reset": Math.ceil(rateLimit.resetIn / 1000).toString(),
-          },
+          headers: getRateLimitHeaders(rateLimit),
         }
       );
     }

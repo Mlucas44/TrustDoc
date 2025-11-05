@@ -2,6 +2,7 @@
  * POST /api/analyze
  *
  * Analyze contract using LLM with strict JSON validation.
+ * - Validates rate limit (3 requests/5min per IP)
  * - Validates input (textClean, contractType)
  * - Checks credits/quota before analysis
  * - Calls LLM with retry logic
@@ -11,6 +12,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
+import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { AnalysisInvalidError } from "@/src/schemas/analysis";
 import { ContractTypeEnum } from "@/src/schemas/detect";
 import { analyzeContract } from "@/src/services/llm/analysis.service";
@@ -36,11 +38,29 @@ export const maxDuration = 60; // 60 seconds for LLM analysis
  * - 401 Unauthorized: Not authenticated
  * - 402 Payment Required: Insufficient credits or quota exceeded
  * - 422 Unprocessable Entity: LLM output invalid after retries
+ * - 429 Too Many Requests: Rate limit exceeded (3 requests/5min)
  * - 500 Internal Server Error: LLM call failed
  */
 export async function POST(request: NextRequest) {
   try {
-    // 1. Check quota/credits
+    // 1. Check rate limit FIRST (before any processing)
+    const rateLimit = checkRateLimitForRoute(request, "/api/analyze");
+
+    if (rateLimit && !rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
+          code: "RATE_LIMIT_EXCEEDED",
+          resetIn: rateLimit.resetIn,
+        },
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimit),
+        }
+      );
+    }
+
+    // 2. Check quota/credits
     const quotaCheck = await requireQuotaOrUserCredit("/api/analyze");
 
     if (!quotaCheck.allowed) {
@@ -59,7 +79,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Parse request body
+    // 3. Parse request body
     let body: { textClean?: string; contractType?: string };
     try {
       body = await request.json();
@@ -74,7 +94,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validate textClean
+    // 4. Validate textClean
     const { textClean, contractType } = body;
 
     if (!textClean || typeof textClean !== "string") {
@@ -111,7 +131,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Validate contractType
+    // 5. Validate contractType
     if (!contractType || typeof contractType !== "string") {
       return NextResponse.json(
         {
@@ -136,7 +156,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Call LLM analysis
+    // 6. Call LLM analysis
     let analysis;
     try {
       analysis = await analyzeContract({
@@ -210,7 +230,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Log success (dev only)
+    // 7. Log success (dev only)
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console
       console.log(`[POST /api/analyze] Success:`, {
@@ -222,7 +242,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 7. Return success response
+    // 8. Return success response
     return NextResponse.json(
       {
         analysis,

@@ -2,6 +2,7 @@
  * POST /api/prepare
  *
  * Complete text preparation pipeline: Parse PDF + Normalize text
+ * - Validates rate limit (5 requests/min per IP)
  * - Validates filePath format
  * - Parses PDF and extracts text
  * - Normalizes and cleans text
@@ -11,6 +12,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
+import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import {
   PdfTextEmptyError,
   PdfFileTooLargeError,
@@ -45,12 +47,30 @@ function validateFilePath(filePath: string): boolean {
  * - 404 Not Found: File not found in storage
  * - 413 Payload Too Large: PDF exceeds 10 MB
  * - 422 Unprocessable Entity: PDF has no text OR text too short after cleanup
+ * - 429 Too Many Requests: Rate limit exceeded (5 requests/min)
  * - 500 Internal Server Error: Parsing/normalization failed
  * - 504 Gateway Timeout: Processing took too long (>20s)
  */
 export async function POST(request: NextRequest) {
   try {
-    // 1. Check quota/credits
+    // 1. Check rate limit FIRST (before any processing)
+    const rateLimit = checkRateLimitForRoute(request, "/api/prepare");
+
+    if (rateLimit && !rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
+          code: "RATE_LIMIT_EXCEEDED",
+          resetIn: rateLimit.resetIn,
+        },
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimit),
+        }
+      );
+    }
+
+    // 2. Check quota/credits
     const quotaCheck = await requireQuotaOrUserCredit("/api/prepare");
 
     if (!quotaCheck.allowed) {
@@ -69,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Parse request body
+    // 3. Parse request body
     let body: { filePath?: string };
     try {
       body = await request.json();
@@ -84,7 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validate filePath
+    // 4. Validate filePath
     const { filePath } = body;
 
     if (!filePath || typeof filePath !== "string") {
@@ -108,7 +128,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Prepare text (parse + normalize) with timeout
+    // 5. Prepare text (parse + normalize) with timeout
     let preparedText;
     try {
       preparedText = await prepareTextFromStorage(filePath, 20000);
@@ -199,7 +219,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Delete source file after successful preparation
+    // 6. Delete source file after successful preparation
     try {
       await deleteFile(filePath);
     } catch (error) {
@@ -207,7 +227,7 @@ export async function POST(request: NextRequest) {
       console.error("[POST /api/prepare] Failed to delete source file:", error);
     }
 
-    // 6. Log success (dev only)
+    // 7. Log success (dev only)
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console
       console.log(`[POST /api/prepare] Success:`, {
@@ -220,7 +240,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 7. Return success response (including contract type if detected)
+    // 8. Return success response (including contract type if detected)
     return NextResponse.json(
       {
         textClean: preparedText.textClean,

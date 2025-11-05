@@ -2,6 +2,7 @@
  * POST /api/parse
  *
  * Parse PDF file and extract text.
+ * - Validates rate limit (10 requests/min per IP)
  * - Validates fileId format
  * - Downloads PDF from storage
  * - Extracts text with page separators
@@ -12,6 +13,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
+import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import {
   parsePdfFromStorageWithTimeout,
   PdfTextEmptyError,
@@ -48,12 +50,30 @@ function validateFilePath(filePath: string): boolean {
  * - 404 Not Found: File not found in storage
  * - 413 Payload Too Large: PDF exceeds 10 MB
  * - 422 Unprocessable Entity: PDF has no text (scanned)
+ * - 429 Too Many Requests: Rate limit exceeded (10 requests/min)
  * - 500 Internal Server Error: Parsing failed
  * - 504 Gateway Timeout: Parsing took too long (>20s)
  */
 export async function POST(request: NextRequest) {
   try {
-    // 1. Check quota/credits
+    // 1. Check rate limit FIRST (before any processing)
+    const rateLimit = checkRateLimitForRoute(request, "/api/parse");
+
+    if (rateLimit && !rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
+          code: "RATE_LIMIT_EXCEEDED",
+          resetIn: rateLimit.resetIn,
+        },
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimit),
+        }
+      );
+    }
+
+    // 2. Check quota/credits
     const quotaCheck = await requireQuotaOrUserCredit("/api/parse");
 
     if (!quotaCheck.allowed) {
@@ -72,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Parse request body
+    // 3. Parse request body
     let body: { filePath?: string };
     try {
       body = await request.json();
@@ -87,7 +107,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validate filePath
+    // 4. Validate filePath
     const { filePath } = body;
 
     if (!filePath || typeof filePath !== "string") {
@@ -111,7 +131,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Parse PDF with timeout (20s)
+    // 5. Parse PDF with timeout (20s)
     let parseResult;
     try {
       parseResult = await parsePdfFromStorageWithTimeout(filePath, 20000);
@@ -185,7 +205,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Delete source file after successful parsing
+    // 6. Delete source file after successful parsing
     try {
       await deleteFile(filePath);
     } catch (error) {
@@ -193,7 +213,7 @@ export async function POST(request: NextRequest) {
       console.error("[POST /api/parse] Failed to delete source file:", error);
     }
 
-    // 6. Log success (dev only)
+    // 7. Log success (dev only)
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console
       console.log(`[POST /api/parse] Success:`, {
@@ -203,7 +223,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 7. Return success response
+    // 8. Return success response
     return NextResponse.json(
       {
         pages: parseResult.pages,
