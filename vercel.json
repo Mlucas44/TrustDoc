@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/jobs/cleanup-pdfs",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/retention-analyses",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/purge-analyses",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

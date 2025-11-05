@@ -74,6 +74,14 @@ const serverSchema = z.object({
   UPLOAD_ALLOWED_MIME_TYPES: z.string().default("application/pdf"), // comma-separated
   MOCK_STORAGE: z.enum(["true", "false"]).default("false"), // boolean flag
 
+  // Data Retention Policy
+  PDF_TTL_MINUTES: z.coerce.number().int().positive().default(30), // minutes
+  ANALYSIS_RETENTION_DAYS: z.coerce.number().int().positive().default(365), // days
+  ANALYSIS_PURGE_DAYS: z.coerce.number().int().positive().default(30), // days
+
+  // CRON Jobs
+  CRON_SECRET: z.string().min(32, "CRON_SECRET must be at least 32 characters"),
+
   // LLM Options
   USE_OLLAMA: z.enum(["true", "false"]).default("false"), // Use local Ollama instead of OpenAI
 });
