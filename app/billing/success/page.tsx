@@ -60,15 +60,15 @@ export default async function BillingSuccessPage(props: SuccessPageProps) {
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <Button asChild variant="default" className="flex-1">
-              <Link href="/credits">
+              <Link href="/credits?success=true">
                 <Coins className="mr-2 h-4 w-4" />
                 Voir mes crédits
               </Link>
             </Button>
             <Button asChild variant="outline" className="flex-1">
-              <Link href="/history">
+              <Link href="/dashboard">
                 <History className="mr-2 h-4 w-4" />
-                Historique
+                Tableau de bord
               </Link>
             </Button>
           </div>
