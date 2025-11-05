@@ -11,8 +11,10 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { logAnalysisPrepared, logAnalysisFailed } from "@/src/lib/logger-events";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
+import { getRequestId } from "@/src/middleware/request-id";
 import {
   PdfTextEmptyError,
   PdfFileTooLargeError,
@@ -52,11 +54,19 @@ function validateFilePath(filePath: string): boolean {
  * - 504 Gateway Timeout: Processing took too long (>20s)
  */
 export async function POST(request: NextRequest) {
+  const t0 = performance.now();
+  const requestId = getRequestId(request);
+
   try {
     // 1. Check rate limit FIRST (before any processing)
     const rateLimit = checkRateLimitForRoute(request, "/api/prepare");
 
     if (rateLimit && !rateLimit.allowed) {
+      logAnalysisFailed({
+        requestId,
+        reason: "RATE_LIMIT_EXCEEDED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
@@ -74,6 +84,11 @@ export async function POST(request: NextRequest) {
     const quotaCheck = await requireQuotaOrUserCredit("/api/prepare");
 
     if (!quotaCheck.allowed) {
+      logAnalysisFailed({
+        requestId,
+        reason: quotaCheck.errorCode || "QUOTA_CHECK_FAILED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       const status =
         quotaCheck.errorCode === "INSUFFICIENT_CREDITS" ||
         quotaCheck.errorCode === "GUEST_QUOTA_EXCEEDED"
@@ -94,7 +109,11 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch (error) {
-      console.error("[POST /api/prepare] Failed to parse JSON:", error);
+      logAnalysisFailed({
+        requestId,
+        reason: "INVALID_JSON",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Invalid request body. Expected JSON with filePath",
@@ -108,6 +127,11 @@ export async function POST(request: NextRequest) {
     const { filePath } = body;
 
     if (!filePath || typeof filePath !== "string") {
+      logAnalysisFailed({
+        requestId,
+        reason: "MISSING_FILE_PATH",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Missing or invalid filePath. Expected string",
@@ -118,6 +142,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!validateFilePath(filePath)) {
+      logAnalysisFailed({
+        requestId,
+        reason: "INVALID_FILE_PATH_FORMAT",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error:
@@ -141,6 +170,11 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // Handle specific errors
       if (error instanceof PdfTextEmptyError) {
+        logAnalysisFailed({
+          requestId,
+          reason: "PDF_TEXT_EMPTY_OR_SCANNED",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error:
@@ -153,6 +187,12 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof TextTooShortError) {
+        logAnalysisFailed({
+          requestId,
+          reason: "TEXT_TOO_SHORT_AFTER_CLEANUP",
+          textLength: error.length,
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error:
@@ -165,6 +205,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof PdfFileTooLargeError) {
+        logAnalysisFailed({
+          requestId,
+          reason: "PDF_TOO_LARGE",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: error.message,
@@ -177,6 +222,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof StorageUploadError) {
+        logAnalysisFailed({
+          requestId,
+          reason: "FILE_NOT_FOUND",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: "File not found in storage",
@@ -188,6 +238,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof Error && error.message.includes("timed out")) {
+        logAnalysisFailed({
+          requestId,
+          reason: "PREPARE_TIMEOUT",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: "Text preparation took too long (>20s). Please try a smaller or simpler PDF.",
@@ -198,7 +253,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof PdfParseError) {
-        console.error("[POST /api/prepare] PDF parse error:", error);
+        logAnalysisFailed({
+          requestId,
+          reason: "PARSE_FAILED",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: "Failed to parse PDF. The file may be corrupted or password-protected.",
@@ -209,7 +268,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Unknown error
-      console.error("[POST /api/prepare] Unknown error:", error);
+      logAnalysisFailed({
+        requestId,
+        reason: "PREPARE_ERROR",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "An unexpected error occurred while preparing the text",
@@ -227,18 +290,15 @@ export async function POST(request: NextRequest) {
       console.error("[POST /api/prepare] Failed to delete source file:", error);
     }
 
-    // 7. Log success (dev only)
-    if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
-      console.log(`[POST /api/prepare] Success:`, {
-        filePath,
-        pages: preparedText.stats.pages,
-        textLengthRaw: preparedText.stats.textLengthRaw,
-        textLengthClean: preparedText.stats.textLengthClean,
-        textTokensApprox: preparedText.textTokensApprox,
-        headings: preparedText.sections?.headings.length || 0,
-      });
-    }
+    // 7. Log text preparation completed
+    logAnalysisPrepared({
+      requestId,
+      pages: preparedText.stats.pages,
+      textLengthRaw: preparedText.stats.textLengthRaw,
+      textLengthClean: preparedText.stats.textLengthClean,
+      textTokensApprox: preparedText.textTokensApprox,
+      durationMs: Math.round(performance.now() - t0),
+    });
 
     // 8. Return success response (including contract type if detected)
     return NextResponse.json(
@@ -254,7 +314,11 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     // Catch-all error handler
-    console.error("[POST /api/prepare] Unexpected error:", error);
+    logAnalysisFailed({
+      requestId,
+      reason: "INTERNAL_ERROR",
+      durationMs: Math.round(performance.now() - t0),
+    });
     return NextResponse.json(
       {
         error: "Internal server error",

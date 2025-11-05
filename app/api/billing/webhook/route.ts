@@ -22,6 +22,11 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { getPackByPriceId } from "@/src/constants/billing";
 import { prisma } from "@/src/lib/db";
+import {
+  logStripeWebhookReceived,
+  logStripeCreditsAdded,
+  logStripeWebhookFailed,
+} from "@/src/lib/logger-events";
 import { getStripeServer } from "@/src/lib/stripe.server";
 import { getRawBody, verifyStripeWebhook } from "@/src/lib/webhook.server";
 
@@ -40,7 +45,9 @@ export async function POST(request: NextRequest) {
     // Get signature from header
     const signature = request.headers.get("stripe-signature");
     if (!signature) {
-      console.error("[Webhook] Missing stripe-signature header");
+      logStripeWebhookFailed({
+        reason: "MISSING_SIGNATURE",
+      });
       return NextResponse.json({ error: "Missing signature" }, { status: 400 });
     }
 
@@ -52,15 +59,17 @@ export async function POST(request: NextRequest) {
     try {
       event = verifyStripeWebhook(rawBody, signature);
     } catch (error) {
-      console.error(
-        "[Webhook] Signature verification failed:",
-        error instanceof Error ? error.message : "Unknown error"
-      );
+      logStripeWebhookFailed({
+        reason: "INVALID_SIGNATURE",
+      });
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
-    // Log event type (for debugging)
-    console.info(`[Webhook] Received event: ${event.type} (${event.id})`);
+    // Log webhook received
+    logStripeWebhookReceived({
+      eventId: event.id,
+      eventType: event.type,
+    });
 
     // Handle different event types
     switch (event.type) {
@@ -74,18 +83,17 @@ export async function POST(request: NextRequest) {
       //   break;
 
       default:
-        // Ignore other event types
-        console.info(`[Webhook] Ignoring event type: ${event.type}`);
+        // Ignore other event types - no logging needed
+        break;
     }
 
     // Always return 200 to acknowledge receipt
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (error) {
     // Log error but return 200 to avoid infinite retries
-    console.error(
-      "[Webhook] Error processing webhook:",
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    logStripeWebhookFailed({
+      reason: "INTERNAL_ERROR",
+    });
 
     // Return 500 for unexpected errors (Stripe will retry)
     return NextResponse.json(
@@ -105,12 +113,14 @@ export async function POST(request: NextRequest) {
 async function handleCheckoutCompleted(event: Stripe.Event) {
   const session = event.data.object as Stripe.Checkout.Session;
 
-  console.info(`[Webhook] Processing checkout session: ${session.id}`);
-
   // Extract user ID from metadata
   const userId = session.metadata?.userId;
   if (!userId) {
-    console.warn(`[Webhook] No userId in session metadata (session: ${session.id})`);
+    logStripeWebhookFailed({
+      reason: "MISSING_USER_ID",
+      eventId: event.id,
+      sessionId: session.id,
+    });
     // Return without error to prevent retries (bad data from client)
     return;
   }
@@ -122,9 +132,12 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
   });
 
   if (!user) {
-    console.warn(
-      `[Webhook] User not found: ${userId} (session: ${session.id}). Event saved as dead letter.`
-    );
+    logStripeWebhookFailed({
+      reason: "USER_NOT_FOUND",
+      eventId: event.id,
+      sessionId: session.id,
+      userId,
+    });
     // Return without error to prevent infinite retries
     return;
   }
@@ -134,7 +147,11 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
   const currency = session.currency || "eur";
 
   if (!amountTotal) {
-    console.warn(`[Webhook] No amount_total in session (session: ${session.id})`);
+    logStripeWebhookFailed({
+      reason: "MISSING_AMOUNT",
+      eventId: event.id,
+      sessionId: session.id,
+    });
     return;
   }
 
@@ -145,30 +162,37 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
   });
 
   if (!lineItems.data || lineItems.data.length === 0) {
-    console.warn(`[Webhook] No line items found (session: ${session.id})`);
+    logStripeWebhookFailed({
+      reason: "NO_LINE_ITEMS",
+      eventId: event.id,
+      sessionId: session.id,
+    });
     return;
   }
 
   // Get first line item's price ID
   const priceId = lineItems.data[0].price?.id;
   if (!priceId) {
-    console.warn(`[Webhook] No price ID in line items (session: ${session.id})`);
+    logStripeWebhookFailed({
+      reason: "MISSING_PRICE_ID",
+      eventId: event.id,
+      sessionId: session.id,
+    });
     return;
   }
 
   // Resolve pack from price ID
   const pack = getPackByPriceId(priceId);
   if (!pack) {
-    console.warn(
-      `[Webhook] Unknown price ID: ${priceId} (session: ${session.id}). Ignoring event.`
-    );
+    logStripeWebhookFailed({
+      reason: "UNKNOWN_PRICE_ID",
+      eventId: event.id,
+      sessionId: session.id,
+      priceId,
+    });
     // Return without error (unknown pack, might be from wrong environment)
     return;
   }
-
-  console.info(
-    `[Webhook] Resolved pack: ${pack.id} (+${pack.credits} credits) for user ${user.email}`
-  );
 
   // Check idempotence: has this event already been processed?
   const existingLedger = await prisma.creditLedger.findUnique({
@@ -176,10 +200,8 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
   });
 
   if (existingLedger) {
-    console.info(
-      `[Webhook] Event already processed: ${event.id}. Skipping credit addition (idempotent).`
-    );
-    return; // Already processed, skip
+    // Already processed - no log needed (normal idempotent behavior)
+    return;
   }
 
   // Create credit ledger entry and update user credits in transaction
@@ -207,17 +229,30 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
           },
         },
       });
-    });
 
-    console.info(
-      `[Webhook] ✓ Successfully credited ${pack.credits} credits to user ${user.email} (event: ${event.id})`
-    );
+      // Get updated user credits
+      const updatedUser = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { credits: true },
+      });
+
+      // Log successful credit addition
+      logStripeCreditsAdded({
+        userId: user.id,
+        creditsAdded: pack.credits,
+        totalCredits: updatedUser?.credits || user.credits + pack.credits,
+        eventId: event.id,
+        sessionId: session.id,
+      });
+    });
   } catch (error) {
     // Transaction failed (might be duplicate key on stripeEventId)
-    console.error(
-      `[Webhook] Transaction failed for event ${event.id}:`,
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    logStripeWebhookFailed({
+      reason: "TRANSACTION_FAILED",
+      eventId: event.id,
+      sessionId: session.id,
+      userId,
+    });
     throw error; // Re-throw to trigger retry
   }
 }

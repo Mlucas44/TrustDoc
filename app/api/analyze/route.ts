@@ -11,8 +11,14 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import {
+  logAnalysisStarted,
+  logAnalysisCompleted,
+  logAnalysisFailed,
+} from "@/src/lib/logger-events";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
+import { getRequestId } from "@/src/middleware/request-id";
 import { AnalysisInvalidError } from "@/src/schemas/analysis";
 import { ContractTypeEnum } from "@/src/schemas/detect";
 import { analyzeContract } from "@/src/services/llm/analysis.service";
@@ -42,11 +48,19 @@ export const maxDuration = 60; // 60 seconds for LLM analysis
  * - 500 Internal Server Error: LLM call failed
  */
 export async function POST(request: NextRequest) {
+  const t0 = performance.now();
+  const requestId = getRequestId(request);
+
   try {
     // 1. Check rate limit FIRST (before any processing)
     const rateLimit = checkRateLimitForRoute(request, "/api/analyze");
 
     if (rateLimit && !rateLimit.allowed) {
+      logAnalysisFailed({
+        requestId,
+        reason: "RATE_LIMIT_EXCEEDED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
@@ -64,6 +78,11 @@ export async function POST(request: NextRequest) {
     const quotaCheck = await requireQuotaOrUserCredit("/api/analyze");
 
     if (!quotaCheck.allowed) {
+      logAnalysisFailed({
+        requestId,
+        reason: quotaCheck.errorCode || "QUOTA_CHECK_FAILED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       const status =
         quotaCheck.errorCode === "INSUFFICIENT_CREDITS" ||
         quotaCheck.errorCode === "GUEST_QUOTA_EXCEEDED"
@@ -84,7 +103,11 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch (error) {
-      console.error("[POST /api/analyze] Failed to parse JSON:", error);
+      logAnalysisFailed({
+        requestId,
+        reason: "INVALID_JSON",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Invalid request body. Expected JSON with textClean and contractType",
@@ -98,6 +121,11 @@ export async function POST(request: NextRequest) {
     const { textClean, contractType } = body;
 
     if (!textClean || typeof textClean !== "string") {
+      logAnalysisFailed({
+        requestId,
+        reason: "MISSING_TEXT_CLEAN",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Missing or invalid textClean. Expected string",
@@ -109,6 +137,12 @@ export async function POST(request: NextRequest) {
 
     // Validate minimum length
     if (textClean.length < 200) {
+      logAnalysisFailed({
+        requestId,
+        reason: "TEXT_TOO_SHORT",
+        textLength: textClean.length,
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Text too short for analysis (min 200 chars)",
@@ -121,6 +155,12 @@ export async function POST(request: NextRequest) {
 
     // Validate maximum length (to prevent excessive LLM costs)
     if (textClean.length > 200000) {
+      logAnalysisFailed({
+        requestId,
+        reason: "TEXT_TOO_LONG",
+        textLength: textClean.length,
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Text too long for analysis (max 200k chars)",
@@ -133,6 +173,11 @@ export async function POST(request: NextRequest) {
 
     // 5. Validate contractType
     if (!contractType || typeof contractType !== "string") {
+      logAnalysisFailed({
+        requestId,
+        reason: "MISSING_CONTRACT_TYPE",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error:
@@ -145,6 +190,11 @@ export async function POST(request: NextRequest) {
 
     const contractTypeValidation = ContractTypeEnum.safeParse(contractType);
     if (!contractTypeValidation.success) {
+      logAnalysisFailed({
+        requestId,
+        reason: "INVALID_CONTRACT_TYPE",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error:
@@ -155,6 +205,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Log analysis started
+    logAnalysisStarted({
+      requestId,
+      userType: quotaCheck.isGuest ? "guest" : "user",
+      userId: quotaCheck.userId,
+      guestId: quotaCheck.guestId,
+      fileId: "inline-text", // No fileId for direct text analysis
+      contractType: contractTypeValidation.data,
+      textLength: textClean.length,
+    });
 
     // 6. Call LLM analysis
     let analysis;
@@ -167,7 +228,12 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // Handle rate limit errors (429)
       if (error instanceof LLMRateLimitError) {
-        console.error("[POST /api/analyze] LLM rate limit exceeded:", error);
+        logAnalysisFailed({
+          requestId,
+          reason: "LLM_RATE_LIMIT_EXCEEDED",
+          provider: error.provider,
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: `Rate limit exceeded for ${error.provider}. Please try again later.`,
@@ -181,7 +247,12 @@ export async function POST(request: NextRequest) {
 
       // Handle transient errors (5xx from provider)
       if (error instanceof LLMTransientError) {
-        console.error("[POST /api/analyze] LLM transient error:", error);
+        logAnalysisFailed({
+          requestId,
+          reason: "LLM_TRANSIENT_ERROR",
+          provider: error.provider,
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: `Temporary error from ${error.provider}. Please try again.`,
@@ -194,7 +265,12 @@ export async function POST(request: NextRequest) {
 
       // Handle provider unavailable errors
       if (error instanceof LLMUnavailableError) {
-        console.error("[POST /api/analyze] LLM provider unavailable:", error);
+        logAnalysisFailed({
+          requestId,
+          reason: "LLM_UNAVAILABLE",
+          provider: error.provider,
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: `LLM provider ${error.provider} is unavailable. Please try again later.`,
@@ -207,7 +283,11 @@ export async function POST(request: NextRequest) {
 
       // Handle invalid LLM output (after retries)
       if (error instanceof AnalysisInvalidError) {
-        console.error("[POST /api/analyze] LLM output invalid after retries:", error);
+        logAnalysisFailed({
+          requestId,
+          reason: "ANALYSIS_INVALID_OUTPUT",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: "Analysis failed: LLM output could not be validated",
@@ -219,7 +299,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Handle other LLM errors
-      console.error("[POST /api/analyze] LLM call failed:", error);
+      logAnalysisFailed({
+        requestId,
+        reason: "ANALYSIS_FAILED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Analysis failed: LLM service error",
@@ -230,17 +314,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. Log success (dev only)
-    if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
-      console.log(`[POST /api/analyze] Success:`, {
-        contractType: contractTypeValidation.data,
-        textLength: textClean.length,
-        riskScore: analysis.riskScore,
-        redFlags: analysis.redFlags.length,
-        clauses: analysis.clauses.length,
-      });
-    }
+    // 7. Log analysis completed
+    logAnalysisCompleted({
+      requestId,
+      riskScore: analysis.riskScore,
+      redFlagsCount: analysis.redFlags.length,
+      clausesCount: analysis.clauses.length,
+      durationMs: Math.round(performance.now() - t0),
+    });
 
     // 8. Return success response
     return NextResponse.json(
@@ -251,7 +332,11 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     // Catch-all error handler
-    console.error("[POST /api/analyze] Unexpected error:", error);
+    logAnalysisFailed({
+      requestId,
+      reason: "INTERNAL_ERROR",
+      durationMs: Math.round(performance.now() - t0),
+    });
     return NextResponse.json(
       {
         error: "Internal server error",

@@ -12,8 +12,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getSession } from "@/src/auth/session";
+import { logUploadStarted, logUploadCompleted, logUploadFailed } from "@/src/lib/logger-events";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
+import { getRequestId } from "@/src/middleware/request-id";
 import { getOrCreateGuestId } from "@/src/services/guest-quota";
 import {
   uploadFile,
@@ -43,11 +45,19 @@ export const runtime = "nodejs";
  * - 500 Internal Server Error: Upload failed
  */
 export async function POST(request: NextRequest) {
+  const t0 = performance.now();
+  const requestId = getRequestId(request);
+
   try {
     // 1. Check rate limit FIRST (before any processing)
     const rateLimit = checkRateLimitForRoute(request, "/api/upload");
 
     if (rateLimit && !rateLimit.allowed) {
+      logUploadFailed({
+        requestId,
+        reason: "RATE_LIMIT_EXCEEDED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: `Trop de requêtes. Veuillez réessayer dans ${Math.ceil(rateLimit.resetIn / 1000)} secondes.`,
@@ -65,6 +75,11 @@ export async function POST(request: NextRequest) {
     const quotaCheck = await requireQuotaOrUserCredit("/api/upload");
 
     if (!quotaCheck.allowed) {
+      logUploadFailed({
+        requestId,
+        reason: quotaCheck.errorCode || "QUOTA_CHECK_FAILED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       // Determine status code based on error
       const status =
         quotaCheck.errorCode === "INSUFFICIENT_CREDITS" ||
@@ -81,22 +96,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Parse FormData
+    // 3. Parse FormData
     let formData: FormData;
     try {
       formData = await request.formData();
     } catch (error) {
-      console.error("[POST /api/upload] Failed to parse FormData:", error);
+      logUploadFailed({
+        requestId,
+        reason: "INVALID_FORM_DATA",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         { error: "Invalid request body. Expected multipart/form-data" },
         { status: 400 }
       );
     }
 
-    // 3. Extract file from FormData
+    // 4. Extract file from FormData
     const file = formData.get("file");
 
     if (!file || !(file instanceof File)) {
+      logUploadFailed({
+        requestId,
+        reason: "MISSING_FILE",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Missing or invalid file. Expected a file in the 'file' field",
@@ -106,11 +130,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Validate file (throws on error)
+    // 5. Validate file (throws on error)
     try {
       validateFile(file);
     } catch (error) {
       if (error instanceof FileTooLargeError) {
+        logUploadFailed({
+          requestId,
+          reason: "FILE_TOO_LARGE",
+          fileSize: file.size,
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: error.message,
@@ -121,6 +151,12 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof UnsupportedFileTypeError) {
+        logUploadFailed({
+          requestId,
+          reason: "UNSUPPORTED_FILE_TYPE",
+          fileType: file.type,
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: error.message,
@@ -131,7 +167,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Unknown validation error
-      console.error("[POST /api/upload] File validation error:", error);
+      logUploadFailed({
+        requestId,
+        reason: "VALIDATION_FAILED",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "File validation failed",
@@ -141,7 +181,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Determine user ID (authenticated user or guest)
+    // 6. Determine user ID (authenticated user or guest)
     const session = await getSession();
     let userId: string;
     let isGuest: boolean;
@@ -156,13 +196,28 @@ export async function POST(request: NextRequest) {
       isGuest = true;
     }
 
-    // 6. Upload file to Supabase Storage
+    // Log upload started
+    logUploadStarted({
+      requestId,
+      userType: isGuest ? "guest" : "user",
+      userId: isGuest ? undefined : userId,
+      guestId: isGuest ? userId : undefined,
+      filename: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+    });
+
+    // 7. Upload file to Supabase Storage
     let uploadResult;
     try {
       uploadResult = await uploadFile(file, userId, isGuest);
     } catch (error) {
       if (error instanceof StorageUploadError) {
-        console.error("[POST /api/upload] Storage upload error:", error);
+        logUploadFailed({
+          requestId,
+          reason: "UPLOAD_FAILED",
+          durationMs: Math.round(performance.now() - t0),
+        });
         return NextResponse.json(
           {
             error: "Failed to upload file to storage",
@@ -174,7 +229,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Unknown upload error
-      console.error("[POST /api/upload] Unknown upload error:", error);
+      logUploadFailed({
+        requestId,
+        reason: "UPLOAD_ERROR",
+        durationMs: Math.round(performance.now() - t0),
+      });
       return NextResponse.json(
         {
           error: "Upload failed due to an unexpected error",
@@ -184,16 +243,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. Log upload (for monitoring/debugging)
-    // eslint-disable-next-line no-console
-    console.log(`[POST /api/upload] File uploaded successfully:`, {
+    // 8. Log upload completed
+    logUploadCompleted({
+      requestId,
       fileId: uploadResult.fileId,
-      userId: isGuest ? `guest-${userId}` : userId,
-      size: uploadResult.size,
-      mimeType: uploadResult.mimeType,
+      filename: uploadResult.filename,
+      fileSize: uploadResult.size,
+      storagePath: uploadResult.path,
+      durationMs: Math.round(performance.now() - t0),
     });
 
-    // 8. Return success response
+    // 9. Return success response
     return NextResponse.json(
       {
         fileId: uploadResult.fileId,
@@ -206,7 +266,11 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     // Catch-all error handler
-    console.error("[POST /api/upload] Unexpected error:", error);
+    logUploadFailed({
+      requestId,
+      reason: "INTERNAL_ERROR",
+      durationMs: Math.round(performance.now() - t0),
+    });
     return NextResponse.json(
       {
         error: "Internal server error",
