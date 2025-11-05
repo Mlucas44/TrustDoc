@@ -142,7 +142,7 @@ async function cleanupPDFsMock(_ttlMinutes: number): Promise<{ deleted: number }
 export async function POST(request: NextRequest) {
   const t0 = performance.now();
   const requestId = getRequestId(request);
-  const jobLogger = logger.child({ requestId, job: "cleanup-pdfs" });
+  const jobLogger = logger.child({ requestId });
 
   // 1. Validate CRON authentication
   const authError = validateCronRequest(request);

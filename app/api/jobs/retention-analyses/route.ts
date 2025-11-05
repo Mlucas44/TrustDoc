@@ -19,10 +19,9 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { env } from "@/src/env";
 import { logger } from "@/src/lib/logger";
+import { prisma } from "@/src/lib/prisma";
 import { validateCronRequest } from "@/src/middleware/cron-auth";
 import { getRequestId } from "@/src/middleware/request-id";
-
-import { prisma } from "@/src/server/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60 seconds for retention job
@@ -59,7 +58,7 @@ async function softDeleteOldAnalyses(retentionDays: number): Promise<{ deleted: 
 export async function POST(request: NextRequest) {
   const t0 = performance.now();
   const requestId = getRequestId(request);
-  const jobLogger = logger.child({ requestId, job: "retention-analyses" });
+  const jobLogger = logger.child({ requestId });
 
   // 1. Validate CRON authentication
   const authError = validateCronRequest(request);
