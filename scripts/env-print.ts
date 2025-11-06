@@ -31,7 +31,9 @@ config({ path: resolve(process.cwd(), ".env") });
   );
   console.log(
     "  NEXT_PUBLIC_STRIPE_PUBLIC_KEY:",
-    env.client.NEXT_PUBLIC_STRIPE_PUBLIC_KEY.substring(0, 15) + "..."
+    env.client.NEXT_PUBLIC_STRIPE_PUBLIC_KEY
+      ? env.client.NEXT_PUBLIC_STRIPE_PUBLIC_KEY.substring(0, 15) + "..."
+      : "[NOT SET]"
   );
 
   console.log("\n🔒 Server Variables (Private):");
@@ -43,10 +45,17 @@ config({ path: resolve(process.cwd(), ".env") });
   console.log("  SUPABASE_SERVICE_ROLE_KEY: [HIDDEN]");
   console.log("  OPENAI_API_KEY: [HIDDEN]");
   console.log("  OLLAMA_BASE_URL:", env.server.OLLAMA_BASE_URL || "[NOT SET]");
-  console.log("  STRIPE_SECRET_KEY:", env.server.STRIPE_SECRET_KEY.substring(0, 10) + "...");
+  console.log(
+    "  STRIPE_SECRET_KEY:",
+    env.server.STRIPE_SECRET_KEY
+      ? env.server.STRIPE_SECRET_KEY.substring(0, 10) + "..."
+      : "[NOT SET]"
+  );
   console.log(
     "  STRIPE_WEBHOOK_SECRET:",
-    env.server.STRIPE_WEBHOOK_SECRET.substring(0, 10) + "..."
+    env.server.STRIPE_WEBHOOK_SECRET
+      ? env.server.STRIPE_WEBHOOK_SECRET.substring(0, 10) + "..."
+      : "[NOT SET]"
   );
   console.log("  RATE_LIMIT_WINDOW:", env.server.RATE_LIMIT_WINDOW + "s");
   console.log("  RATE_LIMIT_MAX:", env.server.RATE_LIMIT_MAX + " requests");
