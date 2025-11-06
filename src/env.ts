@@ -82,6 +82,9 @@ const serverSchema = z.object({
   // CRON Jobs
   CRON_SECRET: z.string().min(32, "CRON_SECRET must be at least 32 characters"),
 
+  // Metrics & Tracing
+  METRICS_SECRET: z.string().min(32, "METRICS_SECRET must be at least 32 characters"),
+
   // LLM Options
   USE_OLLAMA: z.enum(["true", "false"]).default("false"), // Use local Ollama instead of OpenAI
 });
