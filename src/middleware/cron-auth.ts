@@ -36,6 +36,17 @@ export const CRON_SECRET_HEADER = "x-cron-secret";
  * @returns NextResponse with 401 if invalid, null if valid
  */
 export function validateCronRequest(request: NextRequest): NextResponse | null {
+  // Check if CRON_SECRET is configured
+  if (!env.server.CRON_SECRET) {
+    return NextResponse.json(
+      {
+        error: "CRON jobs are not configured on this server",
+        code: "CRON_NOT_CONFIGURED",
+      },
+      { status: 503 }
+    );
+  }
+
   const secret = request.headers.get(CRON_SECRET_HEADER);
 
   if (!secret) {

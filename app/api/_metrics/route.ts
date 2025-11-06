@@ -35,7 +35,18 @@ const METRICS_SECRET_HEADER = "x-metrics-secret";
 export async function GET(request: NextRequest) {
   const t0 = performance.now();
 
-  // 1. Validate authentication
+  // 1. Check if metrics endpoint is configured
+  if (!env.server.METRICS_SECRET) {
+    return NextResponse.json(
+      {
+        error: "Metrics endpoint is not configured on this server",
+        code: "METRICS_NOT_CONFIGURED",
+      },
+      { status: 503 }
+    );
+  }
+
+  // 2. Validate authentication
   const secret = request.headers.get(METRICS_SECRET_HEADER);
 
   if (!secret) {

@@ -80,10 +80,10 @@ const serverSchema = z.object({
   ANALYSIS_PURGE_DAYS: z.coerce.number().int().positive().default(30), // days
 
   // CRON Jobs
-  CRON_SECRET: z.string().min(32, "CRON_SECRET must be at least 32 characters"),
+  CRON_SECRET: z.string().min(32, "CRON_SECRET must be at least 32 characters").optional(),
 
   // Metrics & Tracing
-  METRICS_SECRET: z.string().min(32, "METRICS_SECRET must be at least 32 characters"),
+  METRICS_SECRET: z.string().min(32, "METRICS_SECRET must be at least 32 characters").optional(),
 
   // LLM Options
   USE_OLLAMA: z.enum(["true", "false"]).default("false"), // Use local Ollama instead of OpenAI
