@@ -13,7 +13,14 @@
 
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { CalendarIcon, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  RefreshCw,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -34,7 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
 
 interface HistoryItem {
   id: string;
@@ -68,16 +74,17 @@ const PACK_FILTERS = {
 
 export function PurchaseHistoryTable() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [dateRange, setDateRange] = useState<keyof typeof DATE_RANGES>("all");
   const [packFilter, setPackFilter] = useState<keyof typeof PACK_FILTERS>("all");
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [history, setHistory] = useState<string[]>([]); // For pagination history
-  const { toast } = useToast();
 
   // Fetch history data
   const fetchHistory = async (newCursor?: string, isPrevious = false) => {
     setLoading(true);
+    setError(null);
 
     try {
       // Build query params
@@ -113,13 +120,9 @@ export function PurchaseHistoryTable() {
       if (!isPrevious) {
         setCursor(newCursor);
       }
-    } catch (error) {
-      console.error("Error fetching history:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger l'historique des achats",
-        variant: "destructive",
-      });
+    } catch (err) {
+      console.error("Error fetching history:", err);
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -219,6 +222,21 @@ export function PurchaseHistoryTable() {
           </div>
         </div>
 
+        {/* Error state */}
+        {error && !loading && (
+          <div className="text-center py-12 space-y-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+            <div>
+              <p className="font-semibold text-lg mb-2">Erreur de chargement</p>
+              <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            </div>
+            <Button variant="outline" onClick={() => fetchHistory()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Réessayer
+            </Button>
+          </div>
+        )}
+
         {/* Loading state */}
         {loading && (
           <div className="space-y-2">
@@ -229,7 +247,7 @@ export function PurchaseHistoryTable() {
         )}
 
         {/* Empty state */}
-        {!loading && data && data.items.length === 0 && (
+        {!loading && !error && data && data.items.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">Aucun achat pour l&apos;instant</p>
             <p className="text-sm text-muted-foreground">
@@ -239,7 +257,7 @@ export function PurchaseHistoryTable() {
         )}
 
         {/* Table (desktop) */}
-        {!loading && data && data.items.length > 0 && (
+        {!loading && !error && data && data.items.length > 0 && (
           <>
             <div className="hidden md:block">
               <Table>

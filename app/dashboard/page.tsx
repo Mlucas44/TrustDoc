@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireCurrentUser } from "@/src/auth/current-user";
 import { DashboardUploadSection } from "@/src/components/dashboard/DashboardUploadSection";
+import { OnboardingBanner } from "@/src/components/dashboard/OnboardingBanner";
 
 export default async function DashboardPage() {
   // Require authentication - will throw UnauthorizedError if not authenticated
@@ -24,6 +25,9 @@ export default async function DashboardPage() {
         title={`Bienvenue, ${user.name || "utilisateur"}`}
         description="Analysez vos contrats en toute confiance"
       />
+
+      {/* Onboarding Banner (dismissible) */}
+      <OnboardingBanner userName={user.name} userCredits={user.credits} />
 
       {/* Credits Info Banner */}
       <Alert>

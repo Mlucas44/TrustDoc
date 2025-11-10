@@ -10,6 +10,7 @@
  * - Automatic redirect to analysis results
  */
 
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -25,12 +26,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { UploadDropzone, type UploadResult } from "@/components/upload/upload-dropzone";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardUploadSectionProps {
   userCredits: number;
 }
+
+type AnalysisStep = "preparing" | "analyzing" | "complete";
+
+const STEP_LABELS = {
+  preparing: "Parsing du PDF...",
+  analyzing: "Analyse LLM en cours...",
+  complete: "Finalisation...",
+} as const;
 
 export function DashboardUploadSection({ userCredits }: DashboardUploadSectionProps) {
   const router = useRouter();
@@ -39,6 +49,8 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
   const [uploadedFile, setUploadedFile] = useState<UploadResult | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
+  const [progress, setProgress] = useState(0);
 
   /**
    * Handle successful upload - show confirmation dialog
@@ -66,9 +78,13 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
     if (!uploadedFile) return;
 
     setIsAnalyzing(true);
+    setShowConfirmDialog(false);
 
     try {
       // 1. Prepare the document (parse PDF)
+      setAnalysisStep("preparing");
+      setProgress(10);
+
       const prepareRes = await fetch("/api/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,8 +96,10 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
       }
 
       const { preparedText } = await prepareRes.json();
+      setProgress(40);
 
       // 2. Start analysis
+      setAnalysisStep("analyzing");
       const analyzeRes = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,10 +115,14 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
       }
 
       const { analysisId } = await analyzeRes.json();
+      setProgress(80);
 
       // 3. Redirect to results
+      setAnalysisStep("complete");
+      setProgress(100);
+
       toast({
-        title: "Analyse lancée",
+        title: "Analyse terminée",
         description: "Redirection vers les résultats...",
       });
 
@@ -116,7 +138,8 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
       });
 
       setIsAnalyzing(false);
-      setShowConfirmDialog(false);
+      setAnalysisStep(null);
+      setProgress(0);
     }
   };
 
@@ -157,10 +180,26 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
           <UploadDropzone
             onUploadSuccess={handleUploadSuccess}
             onUploadError={handleUploadError}
-            disabled={userCredits === 0}
+            disabled={userCredits === 0 || isAnalyzing}
           />
         </CardContent>
       </Card>
+
+      {/* Analysis Progress Indicator */}
+      {isAnalyzing && analysisStep && (
+        <Card className="border-primary">
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <div className="flex-1">
+                <p className="font-medium">{STEP_LABELS[analysisStep]}</p>
+                <p className="text-sm text-muted-foreground">Temps estimé : 10-20 secondes</p>
+              </div>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Confirmation Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

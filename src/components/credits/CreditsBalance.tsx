@@ -7,9 +7,10 @@
 
 "use client";
 
-import { Coins, Loader2 } from "lucide-react";
+import { AlertTriangle, Coins, Loader2, RefreshCw } from "lucide-react";
 import useSWR from "swr";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CreditsResponse {
@@ -19,7 +20,7 @@ interface CreditsResponse {
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function CreditsBalance() {
-  const { data, error, isLoading } = useSWR<CreditsResponse>("/api/credits", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<CreditsResponse>("/api/credits", fetcher, {
     refreshInterval: 30000, // Refresh every 30 seconds
   });
 
@@ -27,9 +28,18 @@ export function CreditsBalance() {
     return (
       <Card className="border-destructive">
         <CardHeader>
-          <CardTitle className="text-destructive">Erreur</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Erreur de chargement
+          </CardTitle>
           <CardDescription>Impossible de charger votre solde de crédits</CardDescription>
         </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={() => mutate()} className="w-full">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Réessayer
+          </Button>
+        </CardContent>
       </Card>
     );
   }
