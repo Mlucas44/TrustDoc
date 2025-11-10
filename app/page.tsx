@@ -20,10 +20,10 @@ export default function Home() {
         />
         <div className="flex justify-center gap-4">
           <Button size="lg" asChild>
-            <Link href="/verify">Vérifier un document</Link>
+            <Link href="/dashboard">Analyser un contrat</Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link href="/docs">Documentation</Link>
+            <Link href="/dashboard">Mes analyses</Link>
           </Button>
         </div>
       </section>

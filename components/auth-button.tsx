@@ -57,7 +57,11 @@ export function AuthButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button
+          variant="ghost"
+          className="relative h-10 w-10 rounded-full"
+          aria-label="Menu utilisateur"
+        >
           <Avatar>
             <AvatarImage src={session.user.image || undefined} alt={session.user.name || ""} />
             <AvatarFallback className="bg-blue-600 text-white">
@@ -86,9 +90,9 @@ export function AuthButton() {
           </Link>
         </DropdownMenuItem>
 
-        {/* Profile */}
+        {/* Dashboard */}
         <DropdownMenuItem asChild>
-          <Link href="/dashboard/profile" className="flex cursor-pointer items-center">
+          <Link href="/dashboard" className="flex cursor-pointer items-center">
             <User className="mr-2 h-4 w-4" />
             <span>Mon profil</span>
           </Link>

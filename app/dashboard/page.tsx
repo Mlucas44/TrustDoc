@@ -1,80 +1,75 @@
 /**
  * Dashboard Page
  *
- * Protected page that shows user info and credits after successful authentication.
+ * Protected page that shows user info, credits, and upload functionality.
  */
 
+import Link from "next/link";
+
+import { PageHeader } from "@/components/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireCurrentUser } from "@/src/auth/current-user";
+import { DashboardUploadSection } from "@/src/components/dashboard/DashboardUploadSection";
 
 export default async function DashboardPage() {
   // Require authentication - will throw UnauthorizedError if not authenticated
   const user = await requireCurrentUser();
 
   return (
-    <div className="mx-auto max-w-4xl py-12">
-      <div className="rounded-lg border bg-card p-8 shadow-sm">
-        <h1 className="mb-6 text-3xl font-bold">Tableau de bord</h1>
+    <div className="space-y-8">
+      {/* Page Header */}
+      <PageHeader
+        title={`Bienvenue, ${user.name || "utilisateur"}`}
+        description="Analysez vos contrats en toute confiance"
+      />
 
-        <div className="space-y-6">
-          {/* User Info */}
-          <div className="rounded-lg bg-muted p-6">
-            <h2 className="mb-4 text-xl font-semibold">Informations utilisateur</h2>
-            <dl className="space-y-2">
-              {user.name && (
-                <div className="flex justify-between">
-                  <dt className="font-medium text-muted-foreground">Nom:</dt>
-                  <dd>{user.name}</dd>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <dt className="font-medium text-muted-foreground">Email:</dt>
-                <dd className="font-mono">{user.email}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="font-medium text-muted-foreground">ID:</dt>
-                <dd className="font-mono text-sm">{user.id}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="font-medium text-muted-foreground">Crédits:</dt>
-                <dd className="text-2xl font-bold text-primary">{user.credits}</dd>
-              </div>
-            </dl>
+      {/* Credits Info Banner */}
+      <Alert>
+        <AlertDescription className="flex items-center justify-between">
+          <div>
+            <span className="font-medium">Crédits disponibles: {user.credits}</span>
+            <span className="ml-2 text-sm text-muted-foreground">
+              • Chaque analyse coûte 1 crédit
+            </span>
           </div>
+          {user.credits === 0 && (
+            <Button asChild size="sm">
+              <Link href="/credits">Acheter des crédits</Link>
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
 
-          {/* Success Message */}
-          <div className="rounded-lg border-2 border-green-500 bg-green-50 p-6 dark:bg-green-950">
-            <h3 className="mb-2 text-lg font-semibold text-green-900 dark:text-green-100">
-              ✅ Authentification réussie!
-            </h3>
-            <p className="text-green-800 dark:text-green-200">
-              Vous êtes maintenant connecté avec NextAuth + Google OAuth.
-              <br />
-              Vous avez <strong>{user.credits} crédits</strong> disponibles pour analyser des
-              documents.
-            </p>
-          </div>
+      {/* Upload Section */}
+      <DashboardUploadSection userCredits={user.credits} />
 
-          {/* Quick Actions */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border p-4">
-              <h3 className="mb-2 font-semibold">Analyser un document</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Utilisez vos crédits pour analyser vos contrats
-              </p>
-              <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-                Commencer une analyse
-              </button>
-            </div>
+      {/* Quick Actions Grid */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Mes analyses</CardTitle>
+            <CardDescription>Consultez l&apos;historique de vos analyses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/history">Voir l&apos;historique</Link>
+            </Button>
+          </CardContent>
+        </Card>
 
-            <div className="rounded-lg border p-4">
-              <h3 className="mb-2 font-semibold">Acheter des crédits</h3>
-              <p className="mb-4 text-sm text-muted-foreground">Rechargez votre compte</p>
-              <button className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">
-                Voir les offres
-              </button>
-            </div>
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Acheter des crédits</CardTitle>
+            <CardDescription>Rechargez votre compte pour plus d&apos;analyses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/credits">Voir les offres</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

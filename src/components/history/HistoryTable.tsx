@@ -228,7 +228,10 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                           className="h-8 w-8"
                           title="Voir les points d'attention"
                         >
-                          <Link href={`/analysis/${item.id}#red-flags`}>
+                          <Link
+                            href={`/analysis/${item.id}#red-flags`}
+                            aria-label="Voir les points d'attention"
+                          >
                             <AlertTriangle className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -239,7 +242,10 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                           className="h-8 w-8"
                           title="Voir les clauses clés"
                         >
-                          <Link href={`/analysis/${item.id}#clauses`}>
+                          <Link
+                            href={`/analysis/${item.id}#clauses`}
+                            aria-label="Voir les clauses clés"
+                          >
                             <FileText className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -254,6 +260,7 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               title="Supprimer l'analyse"
                               disabled={deletingId === item.id}
+                              aria-label="Supprimer l'analyse"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -313,7 +320,10 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                       className="shrink-0"
                       title="Voir les points d'attention"
                     >
-                      <Link href={`/analysis/${item.id}#red-flags`}>
+                      <Link
+                        href={`/analysis/${item.id}#red-flags`}
+                        aria-label="Voir les points d'attention"
+                      >
                         <AlertTriangle className="h-4 w-4" />
                       </Link>
                     </Button>
@@ -324,7 +334,10 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                       className="shrink-0"
                       title="Voir les clauses clés"
                     >
-                      <Link href={`/analysis/${item.id}#clauses`}>
+                      <Link
+                        href={`/analysis/${item.id}#clauses`}
+                        aria-label="Voir les clauses clés"
+                      >
                         <FileText className="h-4 w-4" />
                       </Link>
                     </Button>
@@ -339,6 +352,7 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                           className="shrink-0 text-destructive hover:text-destructive"
                           title="Supprimer l'analyse"
                           disabled={deletingId === item.id}
+                          aria-label="Supprimer l'analyse"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -392,7 +406,7 @@ export function HistoryTable({ items, nextCursor, prevCursor }: HistoryTableProp
                 : "Vous n&apos;avez pas encore d&apos;analyse. Importez un PDF pour commencer."}
             </p>
             <Button asChild>
-              <Link href="/">Importer un contrat</Link>
+              <Link href="/dashboard">Importer un contrat</Link>
             </Button>
           </CardContent>
         </Card>
