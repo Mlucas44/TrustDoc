@@ -20,7 +20,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -88,14 +87,15 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
       const prepareRes = await fetch("/api/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileId: uploadedFile.fileId }),
+        body: JSON.stringify({ filePath: uploadedFile.path }),
       });
 
       if (!prepareRes.ok) {
-        throw new Error("Failed to prepare document");
+        const errorData = await prepareRes.json();
+        throw new Error(errorData.error || "Failed to prepare document");
       }
 
-      const { preparedText } = await prepareRes.json();
+      const { textClean: preparedText } = await prepareRes.json();
       setProgress(40);
 
       // 2. Start analysis
@@ -206,7 +206,7 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer l&apos;analyse</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
+            <div className="text-sm text-muted-foreground space-y-3 mt-2">
               <p>
                 Vous êtes sur le point de lancer l&apos;analyse du fichier:{" "}
                 <strong>{uploadedFile?.filename}</strong>
@@ -226,7 +226,7 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
                 L&apos;analyse prendra environ 10-20 secondes. Vous serez redirigé vers les
                 résultats une fois terminé.
               </p>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isAnalyzing}>Annuler</AlertDialogCancel>
