@@ -5,6 +5,7 @@ import { Navbar } from "@/components/navbar";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { KeyboardShortcutsProvider } from "@/src/components/keyboard/KeyboardShortcutsProvider";
 
 import type { Metadata } from "next";
 
@@ -48,6 +49,7 @@ export default function RootLayout({
               </main>
             </div>
             <Toaster />
+            <KeyboardShortcutsProvider />
           </ThemeProvider>
         </SessionProvider>
       </body>
