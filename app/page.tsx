@@ -23,7 +23,7 @@ export default function Home() {
             <Link href="/dashboard">Analyser un contrat</Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link href="/dashboard">Mes analyses</Link>
+            <Link href="/docs">Documentation</Link>
           </Button>
         </div>
       </section>

@@ -22,6 +22,13 @@ export function Navbar() {
             aria-label="Navigation principale"
           >
             <Link
+              href="/docs"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              aria-current={pathname === "/docs" ? "page" : undefined}
+            >
+              Documentation
+            </Link>
+            <Link
               href="/history"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
               aria-current={pathname === "/history" ? "page" : undefined}
