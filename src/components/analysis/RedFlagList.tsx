@@ -7,11 +7,12 @@
  * Automatically sorts by severity (high → medium → low) then alphabetically.
  */
 
-import { AlertCircle, Search } from "lucide-react";
+import { AlertCircle, HelpCircle, Search } from "lucide-react";
 import { useMemo } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useRedFlags, type UseRedFlagsOptions } from "@/src/hooks/useRedFlags";
 import {
@@ -92,9 +93,24 @@ export function RedFlagList({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         {/* Search Input */}
         <div className="flex-1 space-y-2">
-          <Label htmlFor="red-flag-search" className="text-sm font-medium">
-            Search red flags
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="red-flag-search" className="text-sm font-medium">
+              Search red flags
+            </Label>
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>
+                    Les points d&apos;attention (red flags) sont des clauses ou conditions qui
+                    méritent une attention particulière avant la signature du contrat.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"

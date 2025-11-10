@@ -5,9 +5,12 @@
  * Provides immediate visual feedback on contract risk level.
  */
 
+"use client";
+
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { RISK_COLORS, RISK_LABELS, getRiskLevel, type RiskLevel } from "@/src/constants/risk";
 
@@ -72,17 +75,32 @@ export function RiskScoreBadge({
 
   const displayText = showScore ? `${label} (${score})` : label;
 
+  const tooltipContent: Record<RiskLevel, string> = {
+    low: "Risque faible (0-33) : Le contrat présente peu de clauses potentiellement problématiques.",
+    medium: "Risque modéré (34-66) : Certaines clauses méritent votre attention avant signature.",
+    high: "Risque élevé (67-100) : Plusieurs points d'attention importants détectés. Consultation d'un professionnel recommandée.",
+  };
+
   return (
-    <Badge
-      className={cn(
-        badgeSizeVariants({ size }),
-        colors.badge,
-        "border-transparent font-semibold",
-        className
-      )}
-      aria-label={`Risk score: ${label} (${score}%)`}
-    >
-      {displayText}
-    </Badge>
+    <TooltipProvider>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <Badge
+            className={cn(
+              badgeSizeVariants({ size }),
+              colors.badge,
+              "border-transparent font-semibold cursor-help",
+              className
+            )}
+            aria-label={`Risk score: ${label} (${score}%)`}
+          >
+            {displayText}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p>{tooltipContent[level]}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
