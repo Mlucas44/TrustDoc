@@ -10,33 +10,15 @@ import "server-only";
 import { downloadFile } from "@/src/services/storage";
 
 /**
- * Load pdf-parse v2 class dynamically
+ * Load pdf-parse v1 function
  *
- * IMPORTANT: pdf-parse v2.4.5 uses a CLASS-BASED API, not a function!
- * v1: pdfParse(buffer, options) → v2: new PDFParse({ data: buffer })
+ * IMPORTANT: Using pdf-parse v1.1.1 (functional API) for Next.js compatibility.
+ * v2 uses web workers which don't work in Node.js API routes.
  *
- * @see https://www.npmjs.com/package/pdf-parse (v2 migration guide)
+ * v1 API: pdfParse(buffer, options) → returns Promise<data>
  */
-async function loadPDFParseClass() {
-  // pdf-parse is a CommonJS module that needs special handling
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParseModule = require("pdf-parse");
-
-  // pdf-parse v2.4.5 exports PDFParse as a CLASS constructor
-  const PDFParseClass = pdfParseModule.PDFParse || pdfParseModule.default || pdfParseModule;
-
-  if (typeof PDFParseClass !== "function") {
-    console.error("[loadPDFParseClass] Invalid module structure:", {
-      type: typeof PDFParseClass,
-      keys: Object.keys(pdfParseModule),
-      hasPDFParse: !!pdfParseModule.PDFParse,
-      hasDefault: !!pdfParseModule.default,
-    });
-    throw new Error(`pdf-parse PDFParse is not a constructor. Type: ${typeof PDFParseClass}`);
-  }
-
-  return PDFParseClass;
-}
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
 
 /**
  * PDF parsing result
@@ -107,17 +89,14 @@ const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 50;
 
 /**
- * Add page separators to text pages array (pdf-parse v2)
- * Replaces the old pagerender option from v1
+ * Custom page render function that adds page separators (pdf-parse v1)
  */
-function addPageSeparators(pages: Array<string | { text: string }>): string {
-  return pages
-    .map((page, index) => {
-      const pageText = typeof page === "string" ? page : page.text || "";
-      const separator = index > 0 ? `\n\n--- PAGE ${index + 1} ---\n\n` : "";
-      return separator + pageText;
-    })
-    .join("");
+function pageRenderFunction(pageData: { pageNumber: number }) {
+  // Add page separator before each page (except first)
+  if (pageData.pageNumber > 1) {
+    return `\n\n--- PAGE ${pageData.pageNumber} ---\n\n`;
+  }
+  return "";
 }
 
 /**
@@ -164,70 +143,40 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
   // 1. Validate buffer size
   validatePdfSize(buffer);
 
-  // 2. Load PDFParse class (v2 API)
-  const PDFParseClass = await loadPDFParseClass();
-
-  // 3. Create parser instance with buffer
-  let parser;
+  // 2. Parse PDF with v1 API (simple function call)
+  let pdfData;
   try {
-    parser = new PDFParseClass({ data: buffer });
+    pdfData = await pdfParse(buffer, {
+      // Custom page render function to add separators
+      pagerender: pageRenderFunction,
+      // Limit maximum pages for safety (adjust if needed)
+      max: 1000,
+    });
   } catch (error) {
-    console.error("[parsePdfBuffer] Failed to create PDFParse instance:", error);
-    throw new PdfParseError("Failed to initialize PDF parser", error);
+    console.error("[parsePdfBuffer] pdf-parse error:", error);
+    throw new PdfParseError("Failed to parse PDF file", error);
   }
 
-  try {
-    // 4. Extract text using v2 API
-    const result = await parser.getText();
+  // 3. Extract text and validate
+  const textRaw = pdfData.text || "";
+  validateTextContent(textRaw);
 
-    // 5. Process pages and add separators
-    // v2 API returns { text, pages, ... } where pages is an array of page content
-    let textRaw: string;
-    if (result.pages && Array.isArray(result.pages)) {
-      // Add page separators like the old pagerender function
-      textRaw = addPageSeparators(result.pages);
-    } else {
-      // Fallback to plain text if pages array not available
-      textRaw = result.text || "";
-    }
+  // 4. Extract metadata
+  const meta = {
+    title: pdfData.info?.Title,
+    author: pdfData.info?.Author,
+    producer: pdfData.info?.Producer,
+    creator: pdfData.info?.Creator,
+    creationDate: pdfData.info?.CreationDate,
+  };
 
-    // 6. Validate extracted text
-    validateTextContent(textRaw);
-
-    // 7. Get metadata using getInfo()
-    let meta: PdfParseResult["meta"] = {};
-    try {
-      const info = await parser.getInfo();
-      meta = {
-        title: info?.Title,
-        author: info?.Author,
-        producer: info?.Producer,
-        creator: info?.Creator,
-        creationDate: info?.CreationDate,
-      };
-    } catch (metaError) {
-      // Metadata extraction is not critical, continue without it
-      console.warn("[parsePdfBuffer] Failed to extract metadata:", metaError);
-    }
-
-    // 8. Return result
-    return {
-      textRaw,
-      pages: result.pages?.length || 1,
-      textLength: textRaw.length,
-      meta,
-    };
-  } catch (error) {
-    console.error("[parsePdfBuffer] pdf-parse getText() error:", error);
-    throw new PdfParseError("Failed to extract text from PDF", error);
-  } finally {
-    // 9. Clean up parser instance (v2 best practice)
-    try {
-      await parser.destroy();
-    } catch (destroyError) {
-      console.warn("[parsePdfBuffer] Failed to destroy parser:", destroyError);
-    }
-  }
+  // 5. Return result
+  return {
+    textRaw,
+    pages: pdfData.numpages,
+    textLength: textRaw.length,
+    meta,
+  };
 }
 
 /**
