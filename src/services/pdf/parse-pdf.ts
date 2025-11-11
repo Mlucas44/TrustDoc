@@ -2,23 +2,14 @@
  * PDF Parsing Service
  *
  * Extracts text from PDF files with multi-page support and metadata extraction.
- * Uses pdf-parse library with custom page separators for clause extraction.
+ * Uses pdfjs-dist (Mozilla PDF.js) - supports encrypted PDFs, robust text extraction.
  */
 
 import "server-only";
 
-import { downloadFile } from "@/src/services/storage";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-/**
- * Load pdf-parse v1 function
- *
- * IMPORTANT: Using pdf-parse v1.1.1 (functional API) for Next.js compatibility.
- * v2 uses web workers which don't work in Node.js API routes.
- *
- * v1 API: pdfParse(buffer, options) → returns Promise<data>
- */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+import { downloadFile } from "@/src/services/storage";
 
 /**
  * PDF parsing result
@@ -89,17 +80,6 @@ const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 const MIN_TEXT_LENGTH = 50;
 
 /**
- * Custom page render function that adds page separators (pdf-parse v1)
- */
-function pageRenderFunction(pageData: { pageNumber: number }) {
-  // Add page separator before each page (except first)
-  if (pageData.pageNumber > 1) {
-    return `\n\n--- PAGE ${pageData.pageNumber} ---\n\n`;
-  }
-  return "";
-}
-
-/**
  * Validate PDF buffer size
  */
 function validatePdfSize(buffer: Buffer): void {
@@ -127,53 +107,92 @@ function validateTextContent(text: string): void {
 }
 
 /**
- * Parse PDF buffer and extract text
+ * Parse PDF buffer and extract text using pdfjs-dist (Mozilla PDF.js)
  *
  * @param buffer - PDF file buffer
  * @returns Parsed PDF data with text and metadata
- *
- * @example
- * ```ts
- * const buffer = await downloadFile(filePath);
- * const result = await parsePdfBuffer(buffer);
- * console.log(`Extracted ${result.textLength} characters from ${result.pages} pages`);
- * ```
  */
 export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
   // 1. Validate buffer size
   validatePdfSize(buffer);
 
-  // 2. Parse PDF with v1 API (simple function call)
-  let pdfData;
+  // 2. Convert buffer to Uint8Array (required by pdfjs-dist)
+  const data = new Uint8Array(buffer);
+
+  // 3. Load PDF document
+  let pdfDocument;
   try {
-    pdfData = await pdfParse(buffer, {
-      // Custom page render function to add separators
-      pagerender: pageRenderFunction,
-      // Limit maximum pages for safety (adjust if needed)
-      max: 1000,
+    const loadingTask = getDocument({
+      data,
+      useSystemFonts: true,
+      standardFontDataUrl: undefined, // Disable font loading for server-side
     });
+    pdfDocument = await loadingTask.promise;
   } catch (error) {
-    console.error("[parsePdfBuffer] pdf-parse error:", error);
-    throw new PdfParseError("Failed to parse PDF file", error);
+    throw new PdfParseError("Failed to load PDF document", error);
   }
 
-  // 3. Extract text and validate
-  const textRaw = pdfData.text || "";
+  // 4. Extract text from all pages
+  const pageCount = pdfDocument.numPages;
+  const pages: string[] = [];
+
+  try {
+    for (let i = 1; i <= pageCount; i++) {
+      // Get page (pages are 1-indexed in pdfjs-dist)
+      const page = await pdfDocument.getPage(i);
+
+      // Extract text content
+      const textContent = await page.getTextContent();
+
+      // Combine text items into a single string
+      const pageText = textContent.items
+        .map((item: any) => {
+          // Each item has a 'str' property containing the text
+          return item.str || "";
+        })
+        .join(" ");
+
+      pages.push(pageText);
+    }
+  } catch (error) {
+    throw new PdfParseError("Failed to extract text from PDF pages", error);
+  }
+
+  // 5. Join pages with separators
+  const textRaw = pages
+    .map((pageText, index) => {
+      const separator = index > 0 ? `\n\n--- PAGE ${index + 1} ---\n\n` : "";
+      return separator + pageText;
+    })
+    .join("");
+
+  // 6. Validate extracted text
   validateTextContent(textRaw);
 
-  // 4. Extract metadata
+  // 7. Extract metadata
+  let metadata: any;
+  try {
+    metadata = await pdfDocument.getMetadata();
+  } catch (error) {
+    // Metadata extraction is non-critical, use empty object if fails
+    metadata = { info: {}, metadata: null };
+  }
+
   const meta = {
-    title: pdfData.info?.Title,
-    author: pdfData.info?.Author,
-    producer: pdfData.info?.Producer,
-    creator: pdfData.info?.Creator,
-    creationDate: pdfData.info?.CreationDate,
+    title: metadata.info?.Title as string | undefined,
+    author: metadata.info?.Author as string | undefined,
+    producer: metadata.info?.Producer as string | undefined,
+    creator: metadata.info?.Creator as string | undefined,
+    creationDate: metadata.info?.CreationDate as string | undefined,
   };
 
-  // 5. Return result
+  // 8. Cleanup
+  await pdfDocument.destroy();
+
+  // 9. Return result
   return {
     textRaw,
-    pages: pdfData.numpages,
+    pages: pageCount,
     textLength: textRaw.length,
     meta,
   };
@@ -182,56 +201,40 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
 /**
  * Parse PDF from Supabase Storage by file path
  *
- * @param filePath - Path to PDF in storage (e.g., "user-abc123/file.pdf")
- * @returns Parsed PDF data
- *
- * @throws {StorageUploadError} If file not found in storage
- * @throws {PdfFileTooLargeError} If PDF exceeds size limit
- * @throws {PdfTextEmptyError} If PDF has no extractable text
- * @throws {PdfParseError} If parsing fails
+ * @param filePath - Full path in Supabase Storage (e.g. "user-abc/file-xyz.pdf")
+ * @returns Parsed PDF data with text and metadata
  *
  * @example
  * ```ts
- * const result = await parsePdfFromStorage("user-abc123/cm4x5y6z7-1699123456789.pdf");
- * console.log(`Extracted ${result.textLength} characters`);
+ * const result = await parsePdfFromStorage("user-abc123/document-xyz.pdf");
+ * console.log(`Extracted ${result.textLength} characters from ${result.pages} pages`);
  * ```
  */
 export async function parsePdfFromStorage(filePath: string): Promise<PdfParseResult> {
-  // 1. Download file from storage
-  let buffer: Buffer;
-  try {
-    buffer = await downloadFile(filePath);
-  } catch (error) {
-    console.error(`[parsePdfFromStorage] Failed to download file ${filePath}:`, error);
-    throw error; // Re-throw StorageUploadError
-  }
+  // 1. Download PDF from storage
+  const buffer = await downloadFile(filePath);
 
   // 2. Parse buffer
-  return await parsePdfBuffer(buffer);
+  return parsePdfBuffer(buffer);
 }
 
 /**
- * Parse PDF from Supabase Storage with timeout protection
+ * Parse PDF from storage with timeout
  *
- * @param filePath - Path to PDF in storage
- * @param timeoutMs - Timeout in milliseconds (default: 20000ms = 20s)
+ * @param filePath - Full path in storage
+ * @param timeoutMs - Timeout in milliseconds (default: 20000)
  * @returns Parsed PDF data
  *
  * @throws {Error} If parsing times out
- *
- * @example
- * ```ts
- * const result = await parsePdfFromStorageWithTimeout("user-abc123/file.pdf", 20000);
- * ```
  */
 export async function parsePdfFromStorageWithTimeout(
   filePath: string,
-  timeoutMs = 20000
+  timeoutMs: number = 20000
 ): Promise<PdfParseResult> {
-  return await Promise.race([
+  return Promise.race([
     parsePdfFromStorage(filePath),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`PDF parsing timed out after ${timeoutMs}ms`)), timeoutMs)
+      setTimeout(() => reject(new Error("PDF parsing timed out")), timeoutMs)
     ),
   ]);
 }

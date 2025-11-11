@@ -17,7 +17,11 @@
       "Bash(pnpm lint:fix:*)",
       "Bash(pnpm list:*)",
       "Bash(pnpm prisma migrate:*)",
-      "Bash(pnpm eslint:*)"
+      "Bash(pnpm eslint:*)",
+      "Bash(pnpm why:*)",
+      "Bash(node -e:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm dev)"
     ],
     "deny": [],
     "ask": []
