@@ -9,11 +9,16 @@ import "server-only";
 
 import { downloadFile } from "@/src/services/storage";
 
-// pdf-parse doesn't have proper ESM support, use require
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParseModule = require("pdf-parse");
-// Handle both CommonJS default export and direct export
-const pdfParse = pdfParseModule.default || pdfParseModule;
+/**
+ * Load pdf-parse dynamically to handle CommonJS/ESM compatibility
+ */
+async function loadPdfParse() {
+  // pdf-parse is a CommonJS module that needs special handling
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParseModule = require("pdf-parse");
+  // Handle both module.exports and module.exports.default patterns
+  return pdfParseModule.default || pdfParseModule;
+}
 
 /**
  * PDF parsing result
@@ -138,7 +143,10 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
   // 1. Validate buffer size
   validatePdfSize(buffer);
 
-  // 2. Parse PDF with custom page render
+  // 2. Load pdf-parse module dynamically
+  const pdfParse = await loadPdfParse();
+
+  // 3. Parse PDF with custom page render
   let pdfData;
   try {
     pdfData = await pdfParse(buffer, {
