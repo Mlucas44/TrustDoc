@@ -11,7 +11,9 @@ import { downloadFile } from "@/src/services/storage";
 
 // pdf-parse doesn't have proper ESM support, use require
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+const pdfParseModule = require("pdf-parse");
+// Handle both CommonJS default export and direct export
+const pdfParse = pdfParseModule.default || pdfParseModule;
 
 /**
  * PDF parsing result
