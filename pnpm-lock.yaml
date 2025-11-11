@@ -84,8 +84,8 @@ importers:
         specifier: ^6.7.0
         version: 6.7.0(ws@8.18.3)(zod@4.1.12)
       pdf-parse:
-        specifier: 1.1.1
-        version: 1.1.1
+        specifier: 1.1.4
+        version: 1.1.4
       react:
         specifier: ^19.0.0
         version: 19.2.0
@@ -3520,8 +3520,8 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  pdf-parse@1.1.1:
-    resolution: {integrity: sha512-v6ZJ/efsBpGrGGknjtq9J/oC8tZWq0KWL5vQrk2GlzLEQPUDB1ex+13Rmidl1neNN358Jn9EHZw5y07FFtaC7A==}
+  pdf-parse@1.1.4:
+    resolution: {integrity: sha512-XRIRcLgk6ZnUbsHsYXExMw+krrPE81hJ6FQPLdBNhhBefqIQKXu/WeTgNBGSwPrfU0v+UCEwn7AoAUOsVKHFvQ==}
     engines: {node: '>=6.8.1'}
 
   perfect-debounce@1.0.0:
@@ -8086,12 +8086,9 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  pdf-parse@1.1.1:
+  pdf-parse@1.1.4:
     dependencies:
-      debug: 3.2.7
       node-ensure: 0.0.0
-    transitivePeerDependencies:
-      - supports-color
 
   perfect-debounce@1.0.0: {}
 

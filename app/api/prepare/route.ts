@@ -1,12 +1,13 @@
 /**
  * POST /api/prepare
  *
- * Complete text preparation pipeline: Parse PDF + Normalize text
+ * Complete text preparation pipeline: Parse PDF + Normalize text + Persist to DB
  * - Validates rate limit (5 requests/min per IP)
- * - Validates filePath format
+ * - Validates filePath format with Zod
  * - Parses PDF and extracts text
  * - Normalizes and cleans text
- * - Returns ready-to-use payload for LLM analysis
+ * - Persists result to analysis_jobs table for stateless /api/analyze
+ * - Returns jobId for subsequent analysis
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -16,6 +17,11 @@ import { Trace } from "@/src/lib/timing";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { getRequestId } from "@/src/middleware/request-id";
+import { PrepareRequestSchema } from "@/src/schemas/analysis-job";
+import {
+  createAnalysisJob,
+  AnalysisJobDBError,
+} from "@/src/services/db/analysis-job.service";
 import {
   PdfTextEmptyError,
   PdfFileTooLargeError,
@@ -28,30 +34,22 @@ import { TextTooShortError } from "@/src/services/text/normalize";
 export const runtime = "nodejs";
 
 /**
- * Validate file path format to prevent path traversal
- */
-function validateFilePath(filePath: string): boolean {
-  const pathPattern = /^(user-[a-z0-9-]+|guest-[a-z0-9-]+)\/[a-z0-9-]+\.pdf$/i;
-  return pathPattern.test(filePath);
-}
-
-/**
  * POST /api/prepare
  *
- * Prepare text from PDF (parse + normalize)
+ * Prepare text from PDF (parse + normalize + persist to DB)
  *
  * @body { filePath: string } - Full path to PDF in storage
- * @returns { textClean, textTokensApprox, stats, meta, sections }
+ * @returns { jobId: string } - Analysis job ID for /api/analyze
  *
  * @errors
- * - 400 Bad Request: Missing or invalid filePath
+ * - 400 Bad Request: Missing or invalid filePath (Zod validation)
  * - 401 Unauthorized: Not authenticated (guest or user)
  * - 402 Payment Required: Insufficient credits or quota exceeded
  * - 404 Not Found: File not found in storage
  * - 413 Payload Too Large: PDF exceeds 10 MB
  * - 422 Unprocessable Entity: PDF has no text OR text too short after cleanup
  * - 429 Too Many Requests: Rate limit exceeded (5 requests/min)
- * - 500 Internal Server Error: Parsing/normalization failed
+ * - 500 Internal Server Error: Parsing/normalization/DB write failed
  * - 504 Gateway Timeout: Processing took too long (>20s)
  */
 export async function POST(request: NextRequest) {
@@ -106,16 +104,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Parse request body
-    let body: { filePath?: string };
+    // 3. Parse and validate request body with Zod
+    let body;
     try {
-      body = await request.json();
+      const rawBody = await request.json();
+      body = PrepareRequestSchema.parse(rawBody);
     } catch (error) {
       logAnalysisFailed({
         requestId,
-        reason: "INVALID_JSON",
+        reason: "INVALID_REQUEST_BODY",
         durationMs: Math.round(performance.now() - t0),
       });
+
+      if (error instanceof Error && "issues" in error) {
+        // Zod validation error
+        return NextResponse.json(
+          {
+            error: "Invalid request body",
+            code: "INVALID_REQUEST_BODY",
+            details: (error as any).issues,
+          },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
         {
           error: "Invalid request body. Expected JSON with filePath",
@@ -125,50 +137,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Validate filePath
     const { filePath } = body;
 
-    if (!filePath || typeof filePath !== "string") {
-      logAnalysisFailed({
-        requestId,
-        reason: "MISSING_FILE_PATH",
-        durationMs: Math.round(performance.now() - t0),
-      });
-      return NextResponse.json(
-        {
-          error: "Missing or invalid filePath. Expected string",
-          code: "MISSING_FILE_PATH",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!validateFilePath(filePath)) {
-      logAnalysisFailed({
-        requestId,
-        reason: "INVALID_FILE_PATH_FORMAT",
-        durationMs: Math.round(performance.now() - t0),
-      });
-      return NextResponse.json(
-        {
-          error:
-            "Invalid filePath format. Expected format: {user-userId|guest-guestId}/{fileId}.pdf",
-          code: "INVALID_FILE_PATH_FORMAT",
-        },
-        { status: 400 }
-      );
-    }
-
-    // 5. Prepare text (parse + normalize) with timeout
+    // 4. Prepare text (parse + normalize) with timeout
     let preparedText;
     try {
       preparedText = await prepareTextFromStorage(filePath, 20000, true, trace);
-
-      // Debug mode: write raw and clean text to files
-      if (process.env.TEXT_DEBUG === "1") {
-        // Note: We don't have textRaw here directly, but we could modify prepareTextFromStorage
-        // to return it if needed. For now, skip debug output.
-      }
     } catch (error) {
       // Handle specific errors
       if (error instanceof PdfTextEmptyError) {
@@ -255,8 +229,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof PdfParseError) {
-        // Log detailed error for debugging
-        console.error("[POST /api/prepare] PDF parsing error:", error.message, error.cause);
+        console.error(
+          `[POST /api/prepare] [${requestId}] PDF parsing error:`,
+          error.message,
+          error.cause
+        );
 
         logAnalysisFailed({
           requestId,
@@ -265,15 +242,15 @@ export async function POST(request: NextRequest) {
         });
         return NextResponse.json(
           {
-            error: "Failed to parse PDF. The file may be corrupted or password-protected.",
+            error: error.message, // Use the French error message from PdfParseError
             code: "PARSE_FAILED",
-            details: error.message, // Include error details for debugging
           },
           { status: 500 }
         );
       }
 
       // Unknown error
+      console.error(`[POST /api/prepare] [${requestId}] Unexpected error:`, error);
       logAnalysisFailed({
         requestId,
         reason: "PREPARE_ERROR",
@@ -288,7 +265,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Delete source file after successful preparation
+    // 5. Validate textClean minimum length (additional safety check)
+    if (!preparedText.textClean || preparedText.textClean.length < 10) {
+      logAnalysisFailed({
+        requestId,
+        reason: "EMPTY_TEXT_CLEAN",
+        durationMs: Math.round(performance.now() - t0),
+      });
+      return NextResponse.json(
+        {
+          error: "Extracted text is too short or empty after cleanup",
+          code: "EMPTY_TEXT_CLEAN",
+          length: preparedText.textClean?.length || 0,
+        },
+        { status: 422 }
+      );
+    }
+
+    // 6. Persist to database for stateless /api/analyze
+    let jobId: string;
+    try {
+      const endDbWrite = trace.start("db-write");
+
+      jobId = await createAnalysisJob({
+        userId: quotaCheck.userId || quotaCheck.guestId || "anonymous",
+        guestId: quotaCheck.guestId,
+        filePath,
+        filename: filePath.split("/").pop() || undefined,
+        contractType: preparedText.contractType?.type,
+        textClean: preparedText.textClean,
+        textLengthRaw: preparedText.stats.textLengthRaw,
+        textLengthClean: preparedText.stats.textLengthClean,
+        textTokensApprox: preparedText.textTokensApprox,
+        pages: preparedText.stats.pages,
+        meta: preparedText.meta as Record<string, unknown>,
+        sections: (preparedText.sections?.headings || []) as unknown[],
+      });
+
+      endDbWrite();
+
+      console.log(`[POST /api/prepare] [${requestId}] Created job: ${jobId}`);
+    } catch (error) {
+      if (error instanceof AnalysisJobDBError) {
+        console.error(
+          `[POST /api/prepare] [${requestId}] Database write failed:`,
+          error.message,
+          error.cause
+        );
+
+        logAnalysisFailed({
+          requestId,
+          reason: "DB_WRITE_FAILED",
+          durationMs: Math.round(performance.now() - t0),
+        });
+
+        return NextResponse.json(
+          {
+            error: "Failed to save analysis job to database",
+            code: "DB_WRITE_FAILED",
+          },
+          { status: 500 }
+        );
+      }
+
+      throw error; // Rethrow unexpected errors
+    }
+
+    // 7. Delete source file after successful preparation and DB persistence
     const endCleanup = trace.start("cleanup");
     try {
       await deleteFile(filePath);
@@ -296,10 +339,10 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       endCleanup();
       // Log but don't fail the request if deletion fails
-      console.error("[POST /api/prepare] Failed to delete source file:", error);
+      console.error(`[POST /api/prepare] [${requestId}] Failed to delete source file:`, error);
     }
 
-    // 7. Log text preparation completed
+    // 8. Log text preparation completed
     logAnalysisPrepared({
       requestId,
       pages: preparedText.stats.pages,
@@ -309,8 +352,7 @@ export async function POST(request: NextRequest) {
       durationMs: Math.round(performance.now() - t0),
     });
 
-    // 8. Return success response (including contract type if detected)
-    // Add debug headers in development mode
+    // 9. Return jobId for /api/analyze
     const responseHeaders = new Headers();
     if (process.env.NODE_ENV === "development") {
       const headers = trace.toHeaders("x-td-latency-");
@@ -321,17 +363,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        textClean: preparedText.textClean,
-        textTokensApprox: preparedText.textTokensApprox,
-        stats: preparedText.stats,
-        meta: preparedText.meta,
-        sections: preparedText.sections,
-        contractType: preparedText.contractType,
+        jobId,
       },
       { status: 200, headers: responseHeaders }
     );
   } catch (error) {
     // Catch-all error handler
+    console.error(`[POST /api/prepare] [${requestId}] Internal error:`, error);
+
     logAnalysisFailed({
       requestId,
       reason: "INTERNAL_ERROR",

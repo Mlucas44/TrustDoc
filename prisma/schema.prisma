@@ -27,6 +27,13 @@ enum ContractType {
   AUTRE        // Other
 }
 
+/// Analysis job status
+enum AnalysisJobStatus {
+  prepared  // Job created, text extracted and cleaned
+  analyzed  // Analysis completed successfully
+  failed    // Analysis failed permanently
+}
+
 // =============================================================================
 // User Model
 // =============================================================================
@@ -182,6 +189,55 @@ model GuestQuota {
   @@index([createdAt])
   @@index([expiresAt])
   @@map("guest_quotas")
+}
+
+// =============================================================================
+// Analysis Job Model
+// =============================================================================
+
+/// Durable storage for analysis pipeline state between /api/prepare and /api/analyze
+/// Ensures stateless execution and prevents MISSING_TEXT_CLEAN errors
+model AnalysisJob {
+  id               String            @id @default(cuid())
+  userId           String            @map("user_id")
+  guestId          String?           @map("guest_id")
+  status           AnalysisJobStatus @default(prepared)
+
+  // File metadata
+  filePath         String?           @map("file_path")
+  filename         String?
+  contractType     ContractType?     @map("contract_type")
+
+  // Extracted text (persisted for stateless analyze)
+  textRaw          String?           @map("text_raw") @db.Text
+  textClean        String?           @map("text_clean") @db.Text
+  textLengthRaw    Int?              @map("text_length_raw")
+  textLengthClean  Int?              @map("text_length_clean")
+  textTokensApprox Int?              @map("text_tokens_approx")
+  pages            Int?
+
+  // Metadata and sections
+  meta             Json?
+  sections         Json?
+
+  // Analysis result
+  result           Json?
+
+  // Error tracking
+  errorCode        String?           @map("error_code")
+  errorMessage     String?           @map("error_message")
+
+  // Timestamps
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  expiresAt        DateTime          @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '24 hours')")) @map("expires_at")
+
+  @@index([userId])
+  @@index([guestId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("analysis_jobs")
 }
 
 // =============================================================================

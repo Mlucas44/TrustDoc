@@ -3,9 +3,11 @@
  *
  * Analyze contract using LLM with strict JSON validation.
  * - Validates rate limit (3 requests/5min per IP)
- * - Validates input (textClean, contractType)
+ * - Validates jobId with Zod
+ * - Retrieves text_clean from analysis_jobs table (stateless)
  * - Checks credits/quota before analysis
  * - Calls LLM with retry logic
+ * - Updates analysis_jobs with result
  * - Returns structured analysis result
  */
 
@@ -21,7 +23,14 @@ import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { getRequestId } from "@/src/middleware/request-id";
 import { AnalysisInvalidError } from "@/src/schemas/analysis";
-import { ContractTypeEnum } from "@/src/schemas/detect";
+import { AnalyzeRequestSchema } from "@/src/schemas/analysis-job";
+import {
+  getAnalysisJob,
+  updateAnalysisJob,
+  AnalysisJobNotFoundError,
+  AnalysisJobAccessDeniedError,
+  AnalysisJobDBError,
+} from "@/src/services/db/analysis-job.service";
 import { analyzeContract } from "@/src/services/llm/analysis.service";
 import {
   LLMRateLimitError,
@@ -35,18 +44,20 @@ export const maxDuration = 60; // 60 seconds for LLM analysis
 /**
  * POST /api/analyze
  *
- * Analyze contract text with LLM
+ * Analyze contract text with LLM (stateless - reads from DB)
  *
- * @body { textClean: string, contractType: ContractType }
- * @returns { analysis: AnalysisResult }
+ * @body { jobId: string } - Analysis job ID from /api/prepare
+ * @returns { analysis: AnalysisResult, analysisId: string }
  *
  * @errors
- * - 400 Bad Request: Missing or invalid input
+ * - 400 Bad Request: Missing or invalid jobId (Zod validation)
  * - 401 Unauthorized: Not authenticated
  * - 402 Payment Required: Insufficient credits or quota exceeded
- * - 422 Unprocessable Entity: LLM output invalid after retries
+ * - 403 Forbidden: Access denied to job (not owned by user)
+ * - 404 Not Found: Job not found in database
+ * - 422 Unprocessable Entity: LLM output invalid after retries OR text_clean missing/too short
  * - 429 Too Many Requests: Rate limit exceeded (3 requests/5min)
- * - 500 Internal Server Error: LLM call failed
+ * - 500 Internal Server Error: LLM call failed OR DB read/write failed
  */
 export async function POST(request: NextRequest) {
   const t0 = performance.now();
@@ -100,27 +111,134 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Parse request body
-    let body: { textClean?: string; contractType?: string };
+    // 3. Parse and validate request body with Zod
+    let body;
     try {
-      body = await request.json();
+      const rawBody = await request.json();
+      body = AnalyzeRequestSchema.parse(rawBody);
     } catch (error) {
       logAnalysisFailed({
         requestId,
-        reason: "INVALID_JSON",
+        reason: "INVALID_REQUEST_BODY",
         durationMs: Math.round(performance.now() - t0),
       });
+
+      if (error instanceof Error && "issues" in error) {
+        // Zod validation error
+        return NextResponse.json(
+          {
+            error: "Invalid request body",
+            code: "INVALID_REQUEST_BODY",
+            details: (error as any).issues,
+          },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
         {
-          error: "Invalid request body. Expected JSON with textClean and contractType",
+          error: "Invalid request body. Expected JSON with jobId",
           code: "INVALID_JSON",
         },
         { status: 400 }
       );
     }
 
-    // 4. Validate textClean
-    const { textClean, contractType } = body;
+    const { jobId } = body;
+
+    // 4. Retrieve analysis job from database (with access control)
+    let job;
+    try {
+      const endDbRead = trace.start("db-read");
+      job = await getAnalysisJob(jobId, quotaCheck.userId || quotaCheck.guestId || "");
+      endDbRead();
+
+      console.log(
+        `[POST /api/analyze] [${requestId}] Retrieved job: ${jobId} (status: ${job.status})`
+      );
+    } catch (error) {
+      if (error instanceof AnalysisJobNotFoundError) {
+        logAnalysisFailed({
+          requestId,
+          reason: "JOB_NOT_FOUND",
+          durationMs: Math.round(performance.now() - t0),
+        });
+
+        return NextResponse.json(
+          {
+            error: "Analysis job not found",
+            code: "JOB_NOT_FOUND",
+            jobId,
+          },
+          { status: 404 }
+        );
+      }
+
+      if (error instanceof AnalysisJobAccessDeniedError) {
+        logAnalysisFailed({
+          requestId,
+          reason: "ACCESS_DENIED",
+          durationMs: Math.round(performance.now() - t0),
+        });
+
+        return NextResponse.json(
+          {
+            error: "Access denied to this analysis job",
+            code: "ACCESS_DENIED",
+            jobId,
+          },
+          { status: 403 }
+        );
+      }
+
+      if (error instanceof AnalysisJobDBError) {
+        console.error(
+          `[POST /api/analyze] [${requestId}] Database read failed:`,
+          error.message,
+          error.cause
+        );
+
+        logAnalysisFailed({
+          requestId,
+          reason: "DB_READ_FAILED",
+          durationMs: Math.round(performance.now() - t0),
+        });
+
+        return NextResponse.json(
+          {
+            error: "Failed to retrieve analysis job from database",
+            code: "DB_READ_FAILED",
+          },
+          { status: 500 }
+        );
+      }
+
+      throw error; // Rethrow unexpected errors
+    }
+
+    // 5. Check if job already analyzed (idempotence)
+    if (job.status === "analyzed" && job.result) {
+      console.log(`[POST /api/analyze] [${requestId}] Job already analyzed, returning cached result`);
+
+      logAnalysisCompleted({
+        requestId,
+        riskScore: (job.result as any).riskScore || 0,
+        redFlagsCount: (job.result as any).redFlags?.length || 0,
+        clausesCount: (job.result as any).clauses?.length || 0,
+        durationMs: Math.round(performance.now() - t0),
+      });
+
+      return NextResponse.json(
+        {
+          analysis: job.result,
+          analysisId: jobId, // Return jobId as analysisId for compatibility
+        },
+        { status: 200 }
+      );
+    }
+
+    // 6. Validate text_clean exists and is not empty
+    const textClean = job.textClean;
 
     if (!textClean || typeof textClean !== "string") {
       logAnalysisFailed({
@@ -130,10 +248,11 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json(
         {
-          error: "Missing or invalid textClean. Expected string",
+          error: "Missing or invalid text_clean in analysis job. Please re-run /api/prepare",
           code: "MISSING_TEXT_CLEAN",
+          jobId,
         },
-        { status: 400 }
+        { status: 422 }
       );
     }
 
@@ -150,6 +269,7 @@ export async function POST(request: NextRequest) {
           error: "Text too short for analysis (min 200 chars)",
           code: "TEXT_TOO_SHORT",
           length: textClean.length,
+          jobId,
         },
         { status: 422 }
       );
@@ -168,13 +288,16 @@ export async function POST(request: NextRequest) {
           error: "Text too long for analysis (max 200k chars)",
           code: "TEXT_TOO_LONG",
           length: textClean.length,
+          jobId,
         },
         { status: 422 }
       );
     }
 
-    // 5. Validate contractType
-    if (!contractType || typeof contractType !== "string") {
+    // 7. Validate contract type
+    const contractType = job.contractType;
+
+    if (!contractType) {
       logAnalysisFailed({
         requestId,
         reason: "MISSING_CONTRACT_TYPE",
@@ -183,28 +306,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Missing or invalid contractType. Expected one of: CGU, FREELANCE, EMPLOI, NDA, DEVIS, PARTENARIAT, AUTRE",
+            "Missing contract_type in analysis job. Expected one of: CGU, FREELANCE, EMPLOI, NDA, DEVIS, PARTENARIAT, AUTRE",
           code: "MISSING_CONTRACT_TYPE",
+          jobId,
         },
-        { status: 400 }
-      );
-    }
-
-    const contractTypeValidation = ContractTypeEnum.safeParse(contractType);
-    if (!contractTypeValidation.success) {
-      logAnalysisFailed({
-        requestId,
-        reason: "INVALID_CONTRACT_TYPE",
-        durationMs: Math.round(performance.now() - t0),
-      });
-      return NextResponse.json(
-        {
-          error:
-            "Invalid contractType. Must be one of: CGU, FREELANCE, EMPLOI, NDA, DEVIS, PARTENARIAT, AUTRE",
-          code: "INVALID_CONTRACT_TYPE",
-          received: contractType,
-        },
-        { status: 400 }
+        { status: 422 }
       );
     }
 
@@ -214,21 +320,38 @@ export async function POST(request: NextRequest) {
       userType: quotaCheck.isGuest ? "guest" : "user",
       userId: quotaCheck.userId,
       guestId: quotaCheck.guestId,
-      fileId: "inline-text", // No fileId for direct text analysis
-      contractType: contractTypeValidation.data,
+      fileId: jobId, // Use jobId as fileId for logging
+      contractType: contractType as any,
       textLength: textClean.length,
     });
 
-    // 6. Call LLM analysis
+    // 8. Call LLM analysis
     let analysis;
     try {
+      const endLlm = trace.start("llm-analysis");
       analysis = await analyzeContract({
         textClean,
-        contractType: contractTypeValidation.data,
+        contractType: contractType as any,
         trace,
-        // modelHint can be added here if needed (e.g., from query params)
       });
+      endLlm();
     } catch (error) {
+      // Mark job as failed in DB
+      try {
+        await updateAnalysisJob(
+          jobId,
+          "failed",
+          undefined,
+          error instanceof Error ? error.name : "UNKNOWN_ERROR",
+          error instanceof Error ? error.message : String(error)
+        );
+      } catch (dbError) {
+        console.error(
+          `[POST /api/analyze] [${requestId}] Failed to update job status to failed:`,
+          dbError
+        );
+      }
+
       // Handle rate limit errors (429)
       if (error instanceof LLMRateLimitError) {
         logAnalysisFailed({
@@ -243,6 +366,7 @@ export async function POST(request: NextRequest) {
             code: "RATE_LIMIT_EXCEEDED",
             provider: error.provider,
             retryAfter: error.retryAfter,
+            jobId,
           },
           { status: 429 }
         );
@@ -261,6 +385,7 @@ export async function POST(request: NextRequest) {
             error: `Temporary error from ${error.provider}. Please try again.`,
             code: "LLM_TRANSIENT_ERROR",
             provider: error.provider,
+            jobId,
           },
           { status: 503 }
         );
@@ -279,6 +404,7 @@ export async function POST(request: NextRequest) {
             error: `LLM provider ${error.provider} is unavailable. Please try again later.`,
             code: "LLM_UNAVAILABLE",
             provider: error.provider,
+            jobId,
           },
           { status: 503 }
         );
@@ -296,12 +422,15 @@ export async function POST(request: NextRequest) {
             error: "Analysis failed: LLM output could not be validated",
             code: "ANALYSIS_INVALID_OUTPUT",
             validationErrors: error.validationErrors,
+            jobId,
           },
           { status: 422 }
         );
       }
 
       // Handle other LLM errors
+      console.error(`[POST /api/analyze] [${requestId}] LLM analysis failed:`, error);
+
       logAnalysisFailed({
         requestId,
         reason: "ANALYSIS_FAILED",
@@ -312,12 +441,28 @@ export async function POST(request: NextRequest) {
           error: "Analysis failed: LLM service error",
           code: "ANALYSIS_FAILED",
           message: error instanceof Error ? error.message : "Unknown error",
+          jobId,
         },
         { status: 500 }
       );
     }
 
-    // 7. Log analysis completed
+    // 9. Update job status to 'analyzed' and persist result
+    try {
+      const endDbWrite = trace.start("db-write");
+      await updateAnalysisJob(jobId, "analyzed", analysis as any);
+      endDbWrite();
+
+      console.log(`[POST /api/analyze] [${requestId}] Updated job ${jobId} to analyzed`);
+    } catch (error) {
+      console.error(
+        `[POST /api/analyze] [${requestId}] Failed to update job with result:`,
+        error
+      );
+      // Don't fail the request if DB update fails - analysis succeeded
+    }
+
+    // 10. Log analysis completed
     logAnalysisCompleted({
       requestId,
       riskScore: analysis.riskScore,
@@ -326,8 +471,7 @@ export async function POST(request: NextRequest) {
       durationMs: Math.round(performance.now() - t0),
     });
 
-    // 8. Return success response
-    // Add debug headers in development mode
+    // 11. Return success response
     const responseHeaders = new Headers();
     if (process.env.NODE_ENV === "development") {
       const headers = trace.toHeaders("x-td-latency-");
@@ -339,11 +483,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         analysis,
+        analysisId: jobId, // Return jobId as analysisId for compatibility
       },
       { status: 200, headers: responseHeaders }
     );
   } catch (error) {
     // Catch-all error handler
+    console.error(`[POST /api/analyze] [${requestId}] Internal error:`, error);
+
     logAnalysisFailed({
       requestId,
       reason: "INTERNAL_ERROR",

@@ -27,3 +27,6 @@ if (env.server.NODE_ENV === "production") {
 }
 
 export { prisma };
+
+// Export as 'db' for consistency with raw SQL queries
+export const db = prisma;

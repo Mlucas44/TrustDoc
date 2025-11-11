@@ -90,12 +90,17 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
         body: JSON.stringify({ filePath: uploadedFile.path }),
       });
 
+      const prepareData = await prepareRes.json();
+
       if (!prepareRes.ok) {
-        const errorData = await prepareRes.json();
-        throw new Error(errorData.error || "Failed to prepare document");
+        throw new Error(prepareData.error || "Failed to prepare document");
       }
 
-      const { textClean: preparedText } = await prepareRes.json();
+      const jobId = prepareData.jobId;
+      if (!jobId) {
+        throw new Error("No jobId returned from /api/prepare");
+      }
+
       setProgress(40);
 
       // 2. Start analysis
@@ -104,8 +109,7 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          preparedText,
-          filename: uploadedFile.filename,
+          jobId,
         }),
       });
 

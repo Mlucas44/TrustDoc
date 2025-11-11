@@ -120,11 +120,29 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
   // 1. Validate buffer size
   validatePdfSize(buffer);
 
-  // 2. Parse PDF with pdf-parse
+  // 2. Parse PDF with pdf-parse (suppress Crypt warnings)
   let data;
+
+  // Capture console.warn during parsing to downgrade "Crypt" warnings to debug
+  const originalWarn = console.warn;
+  const warnings: string[] = [];
+
+  console.warn = (...args: unknown[]) => {
+    const message = args.join(" ");
+    warnings.push(message);
+
+    // Only log non-Crypt warnings at warn level
+    if (!message.toLowerCase().includes("crypt")) {
+      originalWarn(...args);
+    }
+  };
+
   try {
     data = await pdfParse(buffer);
   } catch (error) {
+    // Restore console.warn
+    console.warn = originalWarn;
+
     // Check if error is due to encryption
     const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error);
 
@@ -140,15 +158,31 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
     }
 
     throw new PdfParseError("Échec de l'analyse du PDF. Le fichier est peut-être corrompu.", error);
+  } finally {
+    // Restore console.warn
+    console.warn = originalWarn;
+
+    // Log Crypt warnings at debug level if any
+    const cryptWarnings = warnings.filter((w) => w.toLowerCase().includes("crypt"));
+    if (cryptWarnings.length > 0 && process.env.DEBUG_PDF === "1") {
+      console.debug("[parsePdfBuffer] PDF Crypt warnings (non-blocking):", cryptWarnings);
+    }
   }
 
   // 3. Extract raw text
   const textRaw = data.text;
 
-  // 4. Validate extracted text
+  // 4. Debug logging
+  console.log("[parsePdfBuffer] Text extraction stats:", {
+    textLength: textRaw.length,
+    alphanumericCount: countAlphanumeric(textRaw),
+    firstChars: textRaw.substring(0, 200),
+  });
+
+  // 5. Validate extracted text
   validateTextContent(textRaw);
 
-  // 5. Extract metadata
+  // 6. Extract metadata
   const meta = {
     title: data.info?.Title,
     author: data.info?.Author,
@@ -157,7 +191,7 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
     creationDate: data.info?.CreationDate,
   };
 
-  // 6. Return result
+  // 7. Return result
   return {
     textRaw,
     pages: data.numpages,
