@@ -255,6 +255,9 @@ export async function POST(request: NextRequest) {
       }
 
       if (error instanceof PdfParseError) {
+        // Log detailed error for debugging
+        console.error("[POST /api/prepare] PDF parsing error:", error.message, error.cause);
+
         logAnalysisFailed({
           requestId,
           reason: "PARSE_FAILED",
@@ -264,6 +267,7 @@ export async function POST(request: NextRequest) {
           {
             error: "Failed to parse PDF. The file may be corrupted or password-protected.",
             code: "PARSE_FAILED",
+            details: error.message, // Include error details for debugging
           },
           { status: 500 }
         );

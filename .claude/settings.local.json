@@ -21,7 +21,10 @@
       "Bash(pnpm why:*)",
       "Bash(node -e:*)",
       "Bash(cat:*)",
-      "Bash(pnpm dev)"
+      "Bash(pnpm dev)",
+      "Bash(pnpm prisma generate:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(pnpm install:*)"
     ],
     "deny": [],
     "ask": []

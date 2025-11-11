@@ -2,12 +2,15 @@
  * PDF Parsing Service
  *
  * Extracts text from PDF files with multi-page support and metadata extraction.
- * Uses pdfjs-dist (Mozilla PDF.js) - supports encrypted PDFs, robust text extraction.
+ * Uses pdf-parse v1.1.1 - Simple and reliable PDF text extraction.
+ *
+ * IMPORTANT: Does NOT support password-protected/encrypted PDFs.
+ * Users must remove password protection before uploading.
  */
 
 import "server-only";
 
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import pdfParse from "pdf-parse";
 
 import { downloadFile } from "@/src/services/storage";
 
@@ -107,92 +110,57 @@ function validateTextContent(text: string): void {
 }
 
 /**
- * Parse PDF buffer and extract text using pdfjs-dist (Mozilla PDF.js)
+ * Parse PDF buffer and extract text using pdf-parse v1.1.1
  *
  * @param buffer - PDF file buffer
  * @returns Parsed PDF data with text and metadata
+ * @throws {PdfParseError} If PDF is encrypted/password-protected or parsing fails
  */
 export async function parsePdfBuffer(buffer: Buffer): Promise<PdfParseResult> {
   // 1. Validate buffer size
   validatePdfSize(buffer);
 
-  // 2. Convert buffer to Uint8Array (required by pdfjs-dist)
-  const data = new Uint8Array(buffer);
-
-  // 3. Load PDF document
-  let pdfDocument;
+  // 2. Parse PDF with pdf-parse
+  let data;
   try {
-    const loadingTask = getDocument({
-      data,
-      useSystemFonts: true,
-      standardFontDataUrl: undefined, // Disable font loading for server-side
-    });
-    pdfDocument = await loadingTask.promise;
+    data = await pdfParse(buffer);
   } catch (error) {
-    throw new PdfParseError("Failed to load PDF document", error);
-  }
+    // Check if error is due to encryption
+    const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error);
 
-  // 4. Extract text from all pages
-  const pageCount = pdfDocument.numPages;
-  const pages: string[] = [];
-
-  try {
-    for (let i = 1; i <= pageCount; i++) {
-      // Get page (pages are 1-indexed in pdfjs-dist)
-      const page = await pdfDocument.getPage(i);
-
-      // Extract text content
-      const textContent = await page.getTextContent();
-
-      // Combine text items into a single string
-      const pageText = textContent.items
-        .map((item: any) => {
-          // Each item has a 'str' property containing the text
-          return item.str || "";
-        })
-        .join(" ");
-
-      pages.push(pageText);
+    if (
+      errorMessage.includes("crypt") ||
+      errorMessage.includes("encrypted") ||
+      errorMessage.includes("password")
+    ) {
+      throw new PdfParseError(
+        "Ce PDF est protégé par mot de passe. Veuillez supprimer la protection et réessayer.",
+        error
+      );
     }
-  } catch (error) {
-    throw new PdfParseError("Failed to extract text from PDF pages", error);
+
+    throw new PdfParseError("Échec de l'analyse du PDF. Le fichier est peut-être corrompu.", error);
   }
 
-  // 5. Join pages with separators
-  const textRaw = pages
-    .map((pageText, index) => {
-      const separator = index > 0 ? `\n\n--- PAGE ${index + 1} ---\n\n` : "";
-      return separator + pageText;
-    })
-    .join("");
+  // 3. Extract raw text
+  const textRaw = data.text;
 
-  // 6. Validate extracted text
+  // 4. Validate extracted text
   validateTextContent(textRaw);
 
-  // 7. Extract metadata
-  let metadata: any;
-  try {
-    metadata = await pdfDocument.getMetadata();
-  } catch (error) {
-    // Metadata extraction is non-critical, use empty object if fails
-    metadata = { info: {}, metadata: null };
-  }
-
+  // 5. Extract metadata
   const meta = {
-    title: metadata.info?.Title as string | undefined,
-    author: metadata.info?.Author as string | undefined,
-    producer: metadata.info?.Producer as string | undefined,
-    creator: metadata.info?.Creator as string | undefined,
-    creationDate: metadata.info?.CreationDate as string | undefined,
+    title: data.info?.Title,
+    author: data.info?.Author,
+    producer: data.info?.Producer,
+    creator: data.info?.Creator,
+    creationDate: data.info?.CreationDate,
   };
 
-  // 8. Cleanup
-  await pdfDocument.destroy();
-
-  // 9. Return result
+  // 6. Return result
   return {
     textRaw,
-    pages: pageCount,
+    pages: data.numpages,
     textLength: textRaw.length,
     meta,
   };
