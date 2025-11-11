@@ -11,13 +11,30 @@ import { downloadFile } from "@/src/services/storage";
 
 /**
  * Load pdf-parse dynamically to handle CommonJS/ESM compatibility
+ *
+ * NOTE: pdf-parse v2.4.5 exports as { PDFParse: function, ... }
+ * NOT as module.exports = function or module.exports.default
  */
 async function loadPdfParse() {
   // pdf-parse is a CommonJS module that needs special handling
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pdfParseModule = require("pdf-parse");
-  // Handle both module.exports and module.exports.default patterns
-  return pdfParseModule.default || pdfParseModule;
+
+  // pdf-parse v2.4.5 exports the function as PDFParse (capitalized)
+  // Fallback order: PDFParse > default > module itself
+  const pdfParse = pdfParseModule.PDFParse || pdfParseModule.default || pdfParseModule;
+
+  if (typeof pdfParse !== "function") {
+    console.error("[loadPdfParse] Invalid module structure:", {
+      type: typeof pdfParse,
+      keys: Object.keys(pdfParseModule),
+      hasPDFParse: !!pdfParseModule.PDFParse,
+      hasDefault: !!pdfParseModule.default,
+    });
+    throw new Error(`pdf-parse module is not a function. Type: ${typeof pdfParse}`);
+  }
+
+  return pdfParse;
 }
 
 /**
