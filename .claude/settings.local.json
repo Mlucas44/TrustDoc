@@ -24,7 +24,19 @@
       "Bash(pnpm dev)",
       "Bash(pnpm prisma generate:*)",
       "Bash(pnpm approve-builds:*)",
-      "Bash(pnpm install:*)"
+      "Bash(pnpm install:*)",
+      "Bash(git checkout:*)",
+      "Bash(mkdir:*)",
+      "Bash(pnpm tsx:*)",
+      "Bash(python3:*)",
+      "Bash(PDF_PAGE_TIMEOUT_MS=3000 pnpm tsx:*)",
+      "Bash(pnpm run pdf:run:simple:*)",
+      "Bash(pnpm run pdf:run:long:*)",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(pnpm env:check:*)",
+      "Bash(rm:*)",
+      "Bash(echo:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

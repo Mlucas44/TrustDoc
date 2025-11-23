@@ -87,6 +87,13 @@ const serverSchema = z.object({
 
   // LLM Options
   USE_OLLAMA: z.enum(["true", "false"]).default("false"), // Use local Ollama instead of OpenAI
+
+  // PDF Parsing Configuration
+  PDF_PARSE_V2: z.enum(["true", "false"]).default("true"), // Enable PDF.js v2 parser (default)
+  PDF_PARSE_V1_LEGACY: z.enum(["true", "false"]).default("false"), // Enable legacy pdf-parse v1 fallback
+  DEV_USE_FIXTURE_STORAGE: z.enum(["true", "false"]).default("false"), // Use fixtures/ instead of Supabase (dev only)
+  PDF_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(4), // Concurrent page extraction (1-8)
+  PDF_PAGE_TIMEOUT_MS: z.coerce.number().int().min(200).max(3000).default(800), // Per-page timeout in ms
 });
 
 // =============================================================================

@@ -24,6 +24,7 @@ import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/ra
 import { getRequestId } from "@/src/middleware/request-id";
 import { AnalysisInvalidError } from "@/src/schemas/analysis";
 import { AnalyzeRequestSchema } from "@/src/schemas/analysis-job";
+import { AnalysisRepo } from "@/src/db/analysis.repo";
 import {
   getAnalysisJob,
   updateAnalysisJob,
@@ -220,6 +221,37 @@ export async function POST(request: NextRequest) {
     if (job.status === "analyzed" && job.result) {
       console.log(`[POST /api/analyze] [${requestId}] Job already analyzed, returning cached result`);
 
+      // For authenticated users, ensure analysis exists in analyses table
+      let analysisId = jobId; // Default for guests or if creation fails
+      if (!quotaCheck.isGuest && quotaCheck.userId) {
+        try {
+          // Try to find existing analysis by looking for matching criteria
+          // Since we don't store analysisId in job, we create a new one if needed
+          const resultSummary = (job.result as any).summary;
+          const createdAnalysis = await AnalysisRepo.create({
+            userId: quotaCheck.userId,
+            filename: job.filename || "document.pdf",
+            type: job.contractType as any,
+            textLength: job.textLengthClean || 0,
+            summary: Array.isArray(resultSummary) ? resultSummary.join(" ") : resultSummary,
+            riskScore: (job.result as any).riskScore || 0,
+            redFlags: (job.result as any).redFlags as any,
+            clauses: (job.result as any).clauses as any,
+            aiResponse: job.result as any,
+          });
+          analysisId = createdAnalysis.id;
+          console.log(
+            `[POST /api/analyze] [${requestId}] Created analysis ${analysisId} for cached result`
+          );
+        } catch (error) {
+          console.error(
+            `[POST /api/analyze] [${requestId}] Failed to create analysis for cached result:`,
+            error
+          );
+          // Continue with jobId as fallback
+        }
+      }
+
       logAnalysisCompleted({
         requestId,
         riskScore: (job.result as any).riskScore || 0,
@@ -231,7 +263,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           analysis: job.result,
-          analysisId: jobId, // Return jobId as analysisId for compatibility
+          analysisId, // Return real analysisId or jobId as fallback
         },
         { status: 200 }
       );
@@ -447,19 +479,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. Update job status to 'analyzed' and persist result
+    // 9. Create analysis in analyses table (for authenticated users only) and update job status
+    let analysisId: string;
     try {
       const endDbWrite = trace.start("db-write");
+
+      // Create persistent analysis record ONLY for authenticated users (not guests)
+      if (!quotaCheck.isGuest && quotaCheck.userId) {
+        const createdAnalysis = await AnalysisRepo.create({
+          userId: quotaCheck.userId,
+          filename: job.filename || "document.pdf",
+          type: contractType as any,
+          textLength: textClean.length,
+          summary: Array.isArray(analysis.summary) ? analysis.summary.join(" ") : analysis.summary,
+          riskScore: analysis.riskScore,
+          redFlags: analysis.redFlags as any,
+          clauses: analysis.clauses as any,
+          aiResponse: analysis as any,
+        });
+
+        analysisId = createdAnalysis.id;
+        console.log(
+          `[POST /api/analyze] [${requestId}] Created analysis ${analysisId} for user ${quotaCheck.userId}`
+        );
+      } else {
+        // For guests, use jobId (no persistent storage in analyses table)
+        analysisId = jobId;
+        console.log(
+          `[POST /api/analyze] [${requestId}] Guest analysis - using jobId ${jobId} (no persistent record)`
+        );
+      }
+
+      // Update job status to 'analyzed' (for both guests and users)
       await updateAnalysisJob(jobId, "analyzed", analysis as any);
       endDbWrite();
 
       console.log(`[POST /api/analyze] [${requestId}] Updated job ${jobId} to analyzed`);
     } catch (error) {
       console.error(
-        `[POST /api/analyze] [${requestId}] Failed to update job with result:`,
+        `[POST /api/analyze] [${requestId}] Failed to create analysis or update job:`,
         error
       );
       // Don't fail the request if DB update fails - analysis succeeded
+      // Fallback to jobId if analysis creation failed
+      analysisId = jobId;
     }
 
     // 10. Log analysis completed
@@ -483,7 +546,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         analysis,
-        analysisId: jobId, // Return jobId as analysisId for compatibility
+        analysisId, // Return real analysis ID from analyses table
       },
       { status: 200, headers: responseHeaders }
     );

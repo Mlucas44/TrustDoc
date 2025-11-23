@@ -23,6 +23,7 @@ export const PrepareRequestSchema = z.object({
       /^(user-[a-z0-9-]+|guest-[a-z0-9-]+)\/[a-z0-9-]+\.pdf$/i,
       "Invalid filePath format. Expected: {user-userId|guest-guestId}/{fileId}.pdf"
     ),
+  pdfPassword: z.string().optional(),
 });
 
 export type PrepareRequest = z.infer<typeof PrepareRequestSchema>;

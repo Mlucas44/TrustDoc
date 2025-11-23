@@ -10,7 +10,8 @@
  * - Automatic redirect to analysis results
  */
 
-import { Loader2 } from "lucide-react";
+import { HelpCircle, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -27,6 +28,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { UploadDropzone, type UploadResult } from "@/components/upload/upload-dropzone";
+import { PdfPasswordDialog } from "@/components/pdf/PdfPasswordDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardUploadSectionProps {
@@ -51,6 +53,11 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep | null>(null);
   const [progress, setProgress] = useState(0);
 
+  // Password dialog state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState<string | undefined>(undefined);
+  const [isPasswordInvalid, setIsPasswordInvalid] = useState(false);
+
   /**
    * Handle successful upload - show confirmation dialog
    */
@@ -71,6 +78,20 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
   };
 
   /**
+   * Handle password submission
+   */
+  const handlePasswordSubmit = (password: string) => {
+    setPdfPassword(password);
+    setIsPasswordInvalid(false);
+    setShowPasswordDialog(false);
+
+    // Retry analysis with password
+    setTimeout(() => {
+      handleStartAnalysis();
+    }, 100);
+  };
+
+  /**
    * Start analysis after confirmation
    */
   const handleStartAnalysis = async () => {
@@ -87,12 +108,25 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
       const prepareRes = await fetch("/api/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filePath: uploadedFile.path }),
+        body: JSON.stringify({
+          filePath: uploadedFile.path,
+          pdfPassword, // Include password if provided
+        }),
       });
 
       const prepareData = await prepareRes.json();
 
+      // Handle password errors
       if (!prepareRes.ok) {
+        if (prepareData.code === "PASSWORD_REQUIRED" || prepareData.code === "PASSWORD_INVALID") {
+          setIsAnalyzing(false);
+          setAnalysisStep(null);
+          setProgress(0);
+          setIsPasswordInvalid(prepareData.code === "PASSWORD_INVALID");
+          setShowPasswordDialog(true);
+          return; // Stop here, wait for password
+        }
+
         throw new Error(prepareData.error || "Failed to prepare document");
       }
 
@@ -152,21 +186,33 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
       {/* Info Banner */}
       <Alert>
         <AlertDescription className="text-sm">
-          <strong>💡 Informations importantes:</strong>
-          <ul className="mt-2 ml-4 list-disc space-y-1">
-            <li>
-              Chaque analyse consomme <strong>1 crédit</strong>
-            </li>
-            <li>
-              Formats acceptés: <strong>PDF uniquement</strong>
-            </li>
-            <li>
-              Taille maximale: <strong>10 Mo</strong>
-            </li>
-            <li>
-              Temps d&apos;analyse estimé: <strong>10-20 secondes</strong>
-            </li>
-          </ul>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <strong>💡 Informations importantes:</strong>
+              <ul className="mt-2 ml-4 list-disc space-y-1">
+                <li>
+                  Chaque analyse consomme <strong>1 crédit</strong>
+                </li>
+                <li>
+                  Formats acceptés: <strong>PDF uniquement</strong>
+                </li>
+                <li>
+                  Taille maximale: <strong>10 Mo</strong>
+                </li>
+                <li>
+                  Temps d&apos;analyse estimé: <strong>10-20 secondes</strong>
+                </li>
+              </ul>
+            </div>
+            <Link
+              href="/docs/pdf-faq"
+              className="flex items-center gap-2 text-sm font-medium text-primary hover:underline whitespace-nowrap"
+              title="Problèmes PDF ? Consultez notre FAQ"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Aide PDF
+            </Link>
+          </div>
         </AlertDescription>
       </Alert>
 
@@ -240,6 +286,15 @@ export function DashboardUploadSection({ userCredits }: DashboardUploadSectionPr
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Password Dialog for Encrypted PDFs */}
+      <PdfPasswordDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onSubmit={handlePasswordSubmit}
+        isInvalidPassword={isPasswordInvalid}
+        isLoading={isAnalyzing}
+      />
     </div>
   );
 }
