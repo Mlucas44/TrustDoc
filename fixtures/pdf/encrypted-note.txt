@@ -1,0 +1,29 @@
+ENCRYPTED PDF FIXTURE
+
+This directory should contain encrypted.pdf for testing password handling.
+
+To generate encrypted.pdf:
+
+Method 1 (qpdf - recommended):
+  qpdf --encrypt test123 "" 40 -- simple.pdf encrypted.pdf
+
+Method 2 (Python + PyPDF2):
+  pip install PyPDF2
+  python3 << 'PYTHON'
+from PyPDF2 import PdfWriter, PdfReader
+reader = PdfReader("simple.pdf")
+writer = PdfWriter()
+for page in reader.pages:
+    writer.add_page(page)
+writer.encrypt(user_password="test123", owner_password="", algorithm="RC4-40")
+with open("encrypted.pdf", "wb") as f:
+    writer.write(f)
+PYTHON
+
+Method 3 (Manual - for CI/CD):
+  Download pre-encrypted test PDF from:
+  https://github.com/mozilla/pdf.js/tree/master/test/pdfs
+  
+Password: test123
+
+For now, the runner will skip encrypted tests if file doesn't exist.

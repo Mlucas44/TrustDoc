@@ -54,18 +54,6 @@ export const RATE_LIMITS: Record<string, RateLimitPolicy> = {
   },
 
   /**
-   * PDF parsing endpoint
-   * 10 requests per minute per IP
-   * More lenient as it's less costly
-   */
-  "/api/parse": {
-    limit: 10,
-    windowMs: 60 * 1000, // 1 minute
-    burst: 2,
-    description: "Parse PDF",
-  },
-
-  /**
    * Text preparation endpoint (parse + normalize)
    * 5 requests per minute per IP
    */
@@ -74,17 +62,6 @@ export const RATE_LIMITS: Record<string, RateLimitPolicy> = {
     windowMs: 60 * 1000, // 1 minute
     burst: 2,
     description: "Prepare text",
-  },
-
-  /**
-   * Contract type detection endpoint
-   * 10 requests per minute per IP
-   */
-  "/api/detect-type": {
-    limit: 10,
-    windowMs: 60 * 1000, // 1 minute
-    burst: 2,
-    description: "Detect contract type",
   },
 } as const;
 

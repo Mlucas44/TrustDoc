@@ -17,16 +17,13 @@ import { Trace } from "@/src/lib/timing";
 import { requireQuotaOrUserCredit } from "@/src/middleware/quota-guard";
 import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/rate-limit";
 import { getRequestId } from "@/src/middleware/request-id";
-import { PrepareRequestSchema } from "@/src/schemas/analysis-job";
-import {
-  createAnalysisJob,
-  AnalysisJobDBError,
-} from "@/src/services/db/analysis-job.service";
 import {
   PdfTextEmptyError,
   PdfFileTooLargeError,
-  PdfParseError,
-} from "@/src/services/pdf/parse-pdf";
+  PdfParseFailedError as PdfParseError,
+} from "@/src/pdf/extract/errors";
+import { PrepareRequestSchema } from "@/src/schemas/analysis-job";
+import { createAnalysisJob, AnalysisJobDBError } from "@/src/services/db/analysis-job.service";
 import { prepareTextFromStorage } from "@/src/services/pipeline/prepare-text";
 import { StorageUploadError, deleteFile } from "@/src/services/storage";
 import { TextTooShortError } from "@/src/services/text/normalize";
@@ -190,8 +187,8 @@ export async function POST(request: NextRequest) {
           {
             error: error.message,
             code: "PDF_TOO_LARGE",
-            size: error.size,
-            maxSize: error.maxSize,
+            size: error.sizeBytes,
+            maxSize: error.maxSizeBytes,
           },
           { status: 413 }
         );
@@ -234,6 +231,29 @@ export async function POST(request: NextRequest) {
           error.message,
           error.cause
         );
+
+        // Check if it's a password-protected PDF
+        const errorMessage = error.message.toLowerCase();
+        if (
+          errorMessage.includes("password") ||
+          errorMessage.includes("protégé") ||
+          errorMessage.includes("encrypted") ||
+          errorMessage.includes("crypt")
+        ) {
+          logAnalysisFailed({
+            requestId,
+            reason: "PASSWORD_REQUIRED",
+            durationMs: Math.round(performance.now() - t0),
+          });
+          return NextResponse.json(
+            {
+              error: "Ce PDF est protégé par mot de passe",
+              code: "PASSWORD_REQUIRED",
+              requiresPassword: true,
+            },
+            { status: 401 }
+          );
+        }
 
         logAnalysisFailed({
           requestId,

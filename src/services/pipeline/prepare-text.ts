@@ -7,12 +7,13 @@
 
 import "server-only";
 
-import { type Trace } from "@/src/lib/timing";
-import { detectContractType } from "@/src/services/detect/contract-type";
-import { parsePdfFromStorageWithTimeout } from "@/src/services/pdf/parse-pdf";
-import { normalizeContractText } from "@/src/services/text/normalize";
-
 import type { DetectionResult } from "@/src/schemas/detect";
+
+import { type Trace } from "@/src/lib/timing";
+import { extractTextWithPdfJs } from "@/src/pdf/extract/pdfjs";
+import { detectContractType } from "@/src/services/detect/contract-type";
+import { downloadFile } from "@/src/services/storage";
+import { normalizeContractText } from "@/src/services/text/normalize";
 
 /**
  * Prepared text payload (ready for LLM)
@@ -95,17 +96,26 @@ export async function prepareTextFromStorage(
   detectType = true,
   trace?: Trace
 ): Promise<PreparedTextPayload> {
-  // 1. Parse PDF (errors are thrown directly)
-  const endPrepare = trace?.start("prepare", { filePath });
-  const pdfData = await parsePdfFromStorageWithTimeout(filePath, timeoutMs);
+  // 1. Download PDF from storage
+  const endDownload = trace?.start("download", { filePath });
+  const pdfBuffer = await downloadFile(filePath);
+  endDownload?.();
 
-  // 2. Normalize text
+  // 2. Parse PDF with pdfjs (errors are thrown directly)
+  const endParse = trace?.start("parse_pdf", { filePath });
+  const pdfData = await extractTextWithPdfJs(pdfBuffer, {
+    pageTimeoutMs: Math.min(timeoutMs / 10, 3000), // Per-page timeout (max 3s)
+  });
+  endParse?.();
+
+  // 3. Normalize text
+  const endNormalize = trace?.start("normalize");
   const normalizeResult = normalizeContractText({
     textRaw: pdfData.textRaw,
     pages: pdfData.pages,
     meta: pdfData.meta as Record<string, string>,
   });
-  endPrepare?.();
+  endNormalize?.();
 
   // 3. Detect contract type (optional, can be disabled for performance)
   let contractTypeResult: DetectionResult | undefined;
