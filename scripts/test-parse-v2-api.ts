@@ -68,6 +68,10 @@ async function mockDeleteFile(filePath: string): Promise<void> {
 }
 
 // Monkey-patch modules BEFORE importing the route
+import { NextRequest } from "next/server";
+
+import { POST } from "../app/api/parse-v2/route";
+
 const Module = require("module");
 const originalRequire = Module.prototype.require;
 
@@ -110,8 +114,6 @@ Module.prototype.require = function (id: string) {
 };
 
 // Import the route AFTER patching
-import { POST } from "../app/api/parse-v2/route";
-import { NextRequest } from "next/server";
 
 /**
  * Create mock NextRequest

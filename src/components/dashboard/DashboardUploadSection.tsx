@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { PdfPasswordDialog } from "@/components/pdf/PdfPasswordDialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -28,7 +29,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { UploadDropzone, type UploadResult } from "@/components/upload/upload-dropzone";
-import { PdfPasswordDialog } from "@/components/pdf/PdfPasswordDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardUploadSectionProps {

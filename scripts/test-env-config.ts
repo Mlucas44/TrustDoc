@@ -39,9 +39,10 @@ console.log(`  PDF_MAX_CONCURRENCY = ${process.env.PDF_MAX_CONCURRENCY}`);
 console.log(`  PDF_PAGE_TIMEOUT_MS = ${process.env.PDF_PAGE_TIMEOUT_MS}`);
 
 // Import after setting env vars
-import { extractTextWithPdfJs } from "../src/pdf/extract/pdfjs";
 import fs from "fs/promises";
 import path from "path";
+
+import { extractTextWithPdfJs } from "../src/pdf/extract/pdfjs";
 
 async function main() {
   const fixturePath = path.join(process.cwd(), "fixtures", "pdf", "simple.pdf");

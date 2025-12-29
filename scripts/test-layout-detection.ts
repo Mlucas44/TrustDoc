@@ -1,0 +1,266 @@
+#!/usr/bin/env tsx
+/**
+ * Test Layout Detection for Cerfa Forms
+ *
+ * Tests the layout-pass implementation across all fixture PDFs.
+ * Validates FORM_CERFA detection and provides detailed metrics.
+ */
+
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
+
+import { analyzeLayoutFromBuffer, computeCerfaLikelihood } from "../src/services/text/layout-pass";
+import { prepareTextFromStorage } from "../src/services/pipeline/prepare-text";
+import { extractTextWithPdfJs } from "../src/pdf/extract/pdfjs";
+
+interface TestResult {
+  filename: string;
+  success: boolean;
+  detectedType?: string;
+  confidence?: number;
+  cerfaScore?: number;
+  layoutMetrics?: {
+    blocks: number;
+    colonLabels: number;
+    fieldLabels: number;
+    checkboxes: number;
+  };
+  error?: string;
+  duration?: number;
+}
+
+/**
+ * Test a single PDF file
+ */
+async function testPdf(filePath: string, filename: string): Promise<TestResult> {
+  const startTime = performance.now();
+
+  try {
+    console.log(`\n📄 Testing: ${filename}`);
+
+    // Read PDF buffer
+    const buffer = readFileSync(filePath);
+    console.log(`   Size: ${(buffer.length / 1024).toFixed(1)} KB`);
+
+    // 1. Test layout analysis
+    console.log(`   Running layout analysis...`);
+    const layoutInfo = await analyzeLayoutFromBuffer(buffer);
+    const cerfaScore = computeCerfaLikelihood(layoutInfo);
+
+    console.log(`   ✅ Layout: ${layoutInfo.blocks.length} blocks`);
+    console.log(
+      `   ✅ Form indicators: ${layoutInfo.formIndicators.colonLabels} labels, ${layoutInfo.formIndicators.checkboxes} checkboxes`
+    );
+    console.log(`   ✅ Cerfa score: ${cerfaScore.toFixed(3)}`);
+
+    // 2. Test text extraction
+    console.log(`   Extracting text...`);
+    const pdfData = await extractTextWithPdfJs(buffer);
+    console.log(`   ✅ Extracted: ${pdfData.textLength} chars from ${pdfData.pages} pages`);
+
+    // Determine expected type based on cerfa score
+    let detectedType = "UNKNOWN";
+    let confidence = 0;
+
+    if (cerfaScore >= 0.45) {
+      detectedType = "FORM_CERFA";
+      confidence = 0.85;
+      console.log(`   🎯 Type: FORM_CERFA (forced by layout, score=${cerfaScore.toFixed(3)})`);
+    } else {
+      console.log(
+        `   ℹ️  Cerfa score too low (${cerfaScore.toFixed(3)} < 0.45), will use heuristic detection`
+      );
+      detectedType = "WILL_USE_HEURISTIC";
+      confidence = 0;
+    }
+
+    const duration = performance.now() - startTime;
+
+    return {
+      filename,
+      success: true,
+      detectedType,
+      confidence,
+      cerfaScore,
+      layoutMetrics: {
+        blocks: layoutInfo.blocks.length,
+        colonLabels: layoutInfo.formIndicators.colonLabels,
+        fieldLabels: layoutInfo.formIndicators.fieldLabels,
+        checkboxes: layoutInfo.formIndicators.checkboxes,
+      },
+      duration,
+    };
+  } catch (error) {
+    const duration = performance.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    console.log(`   ❌ Error: ${errorMessage}`);
+
+    return {
+      filename,
+      success: false,
+      error: errorMessage,
+      duration,
+    };
+  }
+}
+
+/**
+ * Main test runner
+ */
+async function main() {
+  console.log("🧪 TrustDoc - Layout Detection Test Suite");
+  console.log("==========================================\n");
+
+  const fixturesDir = join(process.cwd(), "fixtures", "pdf");
+  const files = readdirSync(fixturesDir).filter((f) => f.endsWith(".pdf"));
+
+  console.log(`Found ${files.length} PDF files to test\n`);
+
+  const results: TestResult[] = [];
+
+  for (const file of files) {
+    const filePath = join(fixturesDir, file);
+    const result = await testPdf(filePath, file);
+    results.push(result);
+  }
+
+  // Print summary
+  console.log("\n\n📊 TEST SUMMARY");
+  console.log("================\n");
+
+  const successful = results.filter((r) => r.success);
+  const failed = results.filter((r) => !r.success);
+  const cerfaDetected = results.filter((r) => r.detectedType === "FORM_CERFA");
+
+  console.log(`✅ Successful: ${successful.length}/${results.length}`);
+  console.log(`❌ Failed: ${failed.length}/${results.length}`);
+  console.log(`🎯 FORM_CERFA detected: ${cerfaDetected.length}/${successful.length}\n`);
+
+  // Detailed results table
+  console.log("Detailed Results:");
+  console.log("─".repeat(120));
+  console.log(
+    "Filename                  | Type              | Cerfa Score | Labels | Checkboxes | Blocks | Duration"
+  );
+  console.log("─".repeat(120));
+
+  for (const result of results) {
+    if (result.success) {
+      const filename = result.filename.padEnd(25);
+      const type = (result.detectedType || "N/A").padEnd(17);
+      const score = result.cerfaScore?.toFixed(3).padStart(11) || "N/A".padStart(11);
+      const labels = result.layoutMetrics?.colonLabels.toString().padStart(6) || "N/A".padStart(6);
+      const checkboxes =
+        result.layoutMetrics?.checkboxes.toString().padStart(10) || "N/A".padStart(10);
+      const blocks = result.layoutMetrics?.blocks.toString().padStart(6) || "N/A".padStart(6);
+      const duration = `${result.duration?.toFixed(0)}ms`.padStart(8);
+
+      console.log(
+        `${filename} | ${type} | ${score} | ${labels} | ${checkboxes} | ${blocks} | ${duration}`
+      );
+    } else {
+      const filename = result.filename.padEnd(25);
+      console.log(`${filename} | ERROR: ${result.error}`);
+    }
+  }
+  console.log("─".repeat(120));
+
+  // Expected vs Actual
+  console.log("\n\n🎯 VALIDATION CRITERIA");
+  console.log("======================\n");
+
+  const expectedCerfa = ["cerfa.pdf", "bulletin_inedis.pdf", "bulletin_nurun.pdf"];
+  const expectedTabular = ["devis_free.pdf", "bon_commande.pdf"];
+  const expectedOther = ["cgu_github.pdf", "nda.pdf", "contrat_inedis.pdf", "contrat_nurun.pdf"];
+
+  console.log("Expected FORM_CERFA:");
+  for (const file of expectedCerfa) {
+    const result = results.find((r) => r.filename === file);
+    if (!result) {
+      console.log(`   ⚠️  ${file} - NOT TESTED`);
+    } else if (!result.success) {
+      console.log(`   ❌ ${file} - ERROR: ${result.error}`);
+    } else if (result.detectedType === "FORM_CERFA") {
+      console.log(`   ✅ ${file} - CORRECTLY detected as FORM_CERFA (score: ${result.cerfaScore?.toFixed(3)})`);
+    } else {
+      console.log(
+        `   ❌ ${file} - WRONG: detected as ${result.detectedType} (score: ${result.cerfaScore?.toFixed(3)} < 0.45)`
+      );
+    }
+  }
+
+  console.log("\nExpected TABULAR_COMMERCIAL or DEVIS (score < 0.45):");
+  for (const file of expectedTabular) {
+    const result = results.find((r) => r.filename === file);
+    if (!result) {
+      console.log(`   ⚠️  ${file} - NOT TESTED`);
+    } else if (!result.success) {
+      console.log(`   ❌ ${file} - ERROR: ${result.error}`);
+    } else if (result.detectedType !== "FORM_CERFA") {
+      console.log(
+        `   ✅ ${file} - CORRECTLY NOT detected as FORM_CERFA (score: ${result.cerfaScore?.toFixed(3)})`
+      );
+    } else {
+      console.log(
+        `   ❌ ${file} - WRONG: detected as FORM_CERFA (score: ${result.cerfaScore?.toFixed(3)} >= 0.45)`
+      );
+    }
+  }
+
+  console.log("\nExpected OTHER types (CGU, NDA, contracts):");
+  for (const file of expectedOther) {
+    const result = results.find((r) => r.filename === file);
+    if (!result) {
+      console.log(`   ⚠️  ${file} - NOT TESTED`);
+    } else if (!result.success) {
+      console.log(`   ❌ ${file} - ERROR: ${result.error}`);
+    } else if (result.detectedType !== "FORM_CERFA") {
+      console.log(
+        `   ✅ ${file} - CORRECTLY NOT detected as FORM_CERFA (score: ${result.cerfaScore?.toFixed(3)})`
+      );
+    } else {
+      console.log(
+        `   ❌ ${file} - WRONG: detected as FORM_CERFA (score: ${result.cerfaScore?.toFixed(3)} >= 0.45)`
+      );
+    }
+  }
+
+  // Final verdict
+  console.log("\n\n🏆 FINAL VERDICT");
+  console.log("================\n");
+
+  const allCerfaCorrect = expectedCerfa.every((file) => {
+    const result = results.find((r) => r.filename === file);
+    return result?.success && result.detectedType === "FORM_CERFA";
+  });
+
+  const allNonCerfaCorrect = [...expectedTabular, ...expectedOther].every((file) => {
+    const result = results.find((r) => r.filename === file);
+    return result?.success && result.detectedType !== "FORM_CERFA";
+  });
+
+  if (allCerfaCorrect && allNonCerfaCorrect) {
+    console.log("✅ ALL TESTS PASSED!");
+    console.log("   - Cerfa forms correctly detected");
+    console.log("   - Non-Cerfa documents correctly excluded");
+    console.log("\n🎉 Layout-pass implementation is WORKING as expected!");
+  } else {
+    console.log("⚠️  SOME TESTS FAILED");
+    if (!allCerfaCorrect) {
+      console.log("   ❌ Some Cerfa forms were NOT detected");
+    }
+    if (!allNonCerfaCorrect) {
+      console.log("   ❌ Some non-Cerfa documents were INCORRECTLY detected as Cerfa");
+    }
+    console.log("\n🔧 Review the detailed results above to debug.");
+  }
+
+  console.log("\n");
+}
+
+// Run tests
+main().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});

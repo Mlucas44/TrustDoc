@@ -178,7 +178,9 @@ export default function PdfFaqPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-md bg-green-50 border border-green-200 dark:bg-green-950/50 dark:border-green-900 p-4">
-              <p className="font-medium mb-2">✅ Option 1 : Version numérique originale (Recommandé)</p>
+              <p className="font-medium mb-2">
+                ✅ Option 1 : Version numérique originale (Recommandé)
+              </p>
               <p className="text-sm text-muted-foreground">
                 Si possible, demandez le document numérique original (Word, Pages, PDF natif).
                 C&apos;est la meilleure option pour une analyse précise.
@@ -186,7 +188,9 @@ export default function PdfFaqPage() {
             </div>
 
             <div className="rounded-md bg-blue-50 border border-blue-200 dark:bg-blue-950/50 dark:border-blue-900 p-4">
-              <p className="font-medium mb-2">🔄 Option 2 : OCR - Reconnaissance de texte (Bientôt)</p>
+              <p className="font-medium mb-2">
+                🔄 Option 2 : OCR - Reconnaissance de texte (Bientôt)
+              </p>
               <p className="text-sm text-muted-foreground mb-3">
                 <strong>Fonctionnalité en développement</strong> : TrustDoc intégrera bientôt
                 l&apos;OCR pour analyser les documents scannés.
@@ -274,7 +278,9 @@ export default function PdfFaqPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">&quot;Fichier non trouvé dans le stockage&quot;</CardTitle>
+              <CardTitle className="text-base">
+                &quot;Fichier non trouvé dans le stockage&quot;
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-2">
@@ -298,7 +304,8 @@ export default function PdfFaqPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-2">
-                <strong>Causes :</strong> Fichier endommagé, format non standard, téléchargement incomplet
+                <strong>Causes :</strong> Fichier endommagé, format non standard, téléchargement
+                incomplet
               </p>
               <p className="text-sm mb-2">
                 <strong>Solutions :</strong>
@@ -325,10 +332,19 @@ export default function PdfFaqPage() {
               <p className="font-medium text-sm">Documentation technique</p>
               <ul className="text-sm text-muted-foreground space-y-1 ml-4">
                 <li>
-                  • <Link href="/docs/tech/API_PARSE_V2_TESTING" className="text-primary hover:underline">Guide des erreurs API</Link>
+                  •{" "}
+                  <Link
+                    href="/docs/tech/API_PARSE_V2_TESTING"
+                    className="text-primary hover:underline"
+                  >
+                    Guide des erreurs API
+                  </Link>
                 </li>
                 <li>
-                  • <Link href="/docs/tech/PDF_CONFIG" className="text-primary hover:underline">Configuration PDF</Link>
+                  •{" "}
+                  <Link href="/docs/tech/PDF_CONFIG" className="text-primary hover:underline">
+                    Configuration PDF
+                  </Link>
                 </li>
               </ul>
             </div>

@@ -166,6 +166,50 @@ const DISCRIMINANT_KEYWORDS: Record<ContractType, Record<string, number>> = {
     "territorial exclusivity": 4,
     subcontracting: 3,
   },
+  FORM_CERFA: {
+    // French
+    cerfa: 5,
+    formulaire: 4,
+    "code postal": 3,
+    commune: 3,
+    département: 3,
+    departement: 3,
+    "nom :": 4,
+    "prénom :": 4,
+    "prenom :": 4,
+    "adresse :": 4,
+    signature: 3,
+    cachet: 3,
+    "date de naissance": 4,
+    "lieu de naissance": 3,
+    nationalité: 3,
+    nationalite: 3,
+    // English
+    "administrative form": 4,
+    "postal code": 3,
+    municipality: 3,
+  },
+  TABULAR_COMMERCIAL: {
+    // French
+    quantité: 3,
+    quantite: 3,
+    "prix unitaire": 4,
+    "montant ht": 4,
+    "montant ttc": 4,
+    "total ht": 4,
+    "total ttc": 4,
+    tva: 3,
+    référence: 2,
+    reference: 2,
+    désignation: 3,
+    designation: 3,
+    // English
+    quantity: 3,
+    "unit price": 4,
+    "total amount": 3,
+    vat: 3,
+    "item description": 3,
+  },
   AUTRE: {},
 };
 
@@ -214,6 +258,22 @@ const STRUCTURAL_PATTERNS: Record<ContractType, RegExp[]> = {
     /article\s+\d+\s*[:-]\s*cooperation/i,
     /exclusivité\s+territoriale/i,
     /exclusivite\s+territoriale/i,
+  ],
+  FORM_CERFA: [
+    /cerfa\s+n°/i,
+    /cerfa\s+numero/i,
+    /formulaire\s+cerfa/i,
+    /nom\s*:/i,
+    /prénom\s*:/i,
+    /prenom\s*:/i,
+    /code\s+postal\s*:/i,
+  ],
+  TABULAR_COMMERCIAL: [
+    /prix\s+unitaire/i,
+    /quantité/i,
+    /quantite/i,
+    /montant\s+ht/i,
+    /total\s+ttc/i,
   ],
   AUTRE: [],
 };
@@ -266,6 +326,8 @@ export function detectTypeHeuristic(text: string): HeuristicResult {
     "NDA",
     "DEVIS",
     "PARTENARIAT",
+    "FORM_CERFA",
+    "TABULAR_COMMERCIAL",
     "AUTRE",
   ];
 
@@ -346,6 +408,8 @@ function scoreByKeywords(text: string): Record<string, number> {
     "NDA",
     "DEVIS",
     "PARTENARIAT",
+    "FORM_CERFA",
+    "TABULAR_COMMERCIAL",
     "AUTRE",
   ];
 
@@ -385,6 +449,8 @@ function scoreByStructure(text: string): Record<string, number> {
     "NDA",
     "DEVIS",
     "PARTENARIAT",
+    "FORM_CERFA",
+    "TABULAR_COMMERCIAL",
     "AUTRE",
   ];
 

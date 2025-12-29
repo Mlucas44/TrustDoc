@@ -13,6 +13,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { AnalysisRepo } from "@/src/db/analysis.repo";
 import {
   logAnalysisStarted,
   logAnalysisCompleted,
@@ -24,7 +25,6 @@ import { checkRateLimitForRoute, getRateLimitHeaders } from "@/src/middleware/ra
 import { getRequestId } from "@/src/middleware/request-id";
 import { AnalysisInvalidError } from "@/src/schemas/analysis";
 import { AnalyzeRequestSchema } from "@/src/schemas/analysis-job";
-import { AnalysisRepo } from "@/src/db/analysis.repo";
 import {
   getAnalysisJob,
   updateAnalysisJob,
@@ -219,7 +219,9 @@ export async function POST(request: NextRequest) {
 
     // 5. Check if job already analyzed (idempotence)
     if (job.status === "analyzed" && job.result) {
-      console.log(`[POST /api/analyze] [${requestId}] Job already analyzed, returning cached result`);
+      console.log(
+        `[POST /api/analyze] [${requestId}] Job already analyzed, returning cached result`
+      );
 
       // For authenticated users, ensure analysis exists in analyses table
       let analysisId = jobId; // Default for guests or if creation fails

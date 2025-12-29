@@ -71,6 +71,22 @@ const CLAUSE_TYPES_BY_CONTRACT: Record<ContractType, string[]> = {
     "Résiliation",
     "Responsabilités",
   ],
+  FORM_CERFA: [
+    "Identité du déclarant",
+    "Objet de la déclaration",
+    "Informations requises",
+    "Pièces justificatives",
+    "Date et signature",
+    "Mentions légales",
+  ],
+  TABULAR_COMMERCIAL: [
+    "Désignation des articles",
+    "Prix unitaires",
+    "Quantités",
+    "Remises & conditions",
+    "Montants HT/TTC",
+    "Conditions de paiement",
+  ],
   AUTRE: [
     "Objet du contrat",
     "Parties contractantes",

@@ -10,7 +10,6 @@
  */
 
 // Only import server-only in Next.js context (not standalone scripts)
-// @ts-expect-error - conditional import
 if (typeof window === "undefined" && process.env.NEXT_RUNTIME !== undefined) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require("server-only");

@@ -7,16 +7,13 @@
  * 3. Empty text detection (scanned PDFs)
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fs from "fs/promises";
 import * as path from "path";
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+import { PdfTextEmptyError, PdfPageTimeoutError } from "../errors";
 import { extractTextWithPdfJs } from "../pdfjs";
-import {
-  PdfPasswordRequiredError,
-  PdfPasswordInvalidError,
-  PdfTextEmptyError,
-  PdfPageTimeoutError,
-} from "../errors";
 
 // Helper to load fixture PDFs
 async function loadFixture(filename: string): Promise<Buffer> {

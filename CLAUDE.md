@@ -32,6 +32,7 @@ pnpm format                 # Format code with Prettier
 pnpm db:studio              # Open Prisma Studio GUI
 pnpm db:push                # Push schema changes to DB
 pnpm db:seed                # Seed database with test data
+pnpm db:truncate            # Clear all data (keep schema)
 pnpm db:reset               # Reset database (destructive)
 ```
 
@@ -39,6 +40,16 @@ pnpm db:reset               # Reset database (destructive)
 ```bash
 pnpm test:e2e               # Run Playwright E2E tests
 pnpm test:e2e:ui            # Run tests in UI mode
+```
+
+### PDF Testing (Development)
+```bash
+pnpm pdf:run:simple         # Test with simple PDF fixture
+pnpm pdf:run:long           # Test with long document
+pnpm pdf:run:empty          # Test empty text edge case
+pnpm pdf:run:encrypted      # Test encrypted PDF with password
+pnpm pdf:run:encrypted:nopass   # Test encrypted PDF without password
+pnpm pdf:fixtures           # Generate PDF test fixtures
 ```
 
 ### Build & Deploy
@@ -272,9 +283,9 @@ See [TESTING_API_PIPELINE.md](docs/TESTING_API_PIPELINE.md) for complete curl ex
 ### PDF Encrypted Files
 
 - **pdf-parse v1.1.4** does not support password-protected PDFs
-- Error is caught and returns user-friendly message
+- Error is caught and returns user-friendly message with code `PDF_ENCRYPTED`
 - Logs "Crypt" warning at debug level (non-blocking)
-- Workaround: Ask users to remove password protection
+- Workaround: Ask users to remove password protection before upload
 
 ### Testing
 

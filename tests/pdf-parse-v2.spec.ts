@@ -14,9 +14,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("PDF Parse V2 API Routes", () => {
-  test("should return 404 when feature flag is disabled", async ({
-    request,
-  }) => {
+  test("should return 404 when feature flag is disabled", async ({ request }) => {
     // Note: This test assumes PDF_PARSE_V2=false in test env
     // Skip if feature flag is enabled
     const response = await request.post("/api/parse-v2", {
@@ -58,14 +56,9 @@ test.describe("PDF Parse V2 API Routes", () => {
     expect(body.code).toBe("FILE_NOT_FOUND");
   });
 
-  test("should return 200 for successful parse (simple PDF)", async ({
-    request,
-  }) => {
+  test("should return 200 for successful parse (simple PDF)", async ({ request }) => {
     // Note: Requires DEV_USE_FIXTURE_STORAGE=true and fixtures uploaded to Supabase
-    test.skip(
-      !process.env.DEV_USE_FIXTURE_STORAGE,
-      "Fixture storage not enabled"
-    );
+    test.skip(!process.env.DEV_USE_FIXTURE_STORAGE, "Fixture storage not enabled");
 
     const response = await request.post("/api/parse-v2", {
       data: { filePath: "user-test123/simple.pdf" },
@@ -82,10 +75,7 @@ test.describe("PDF Parse V2 API Routes", () => {
   });
 
   test("should return 422 for empty-text PDF", async ({ request }) => {
-    test.skip(
-      !process.env.DEV_USE_FIXTURE_STORAGE,
-      "Fixture storage not enabled"
-    );
+    test.skip(!process.env.DEV_USE_FIXTURE_STORAGE, "Fixture storage not enabled");
 
     const response = await request.post("/api/parse-v2", {
       data: { filePath: "user-test123/empty-text.pdf" },
@@ -98,10 +88,7 @@ test.describe("PDF Parse V2 API Routes", () => {
   });
 
   test("should handle multi-page PDF successfully", async ({ request }) => {
-    test.skip(
-      !process.env.DEV_USE_FIXTURE_STORAGE,
-      "Fixture storage not enabled"
-    );
+    test.skip(!process.env.DEV_USE_FIXTURE_STORAGE, "Fixture storage not enabled");
 
     const response = await request.post("/api/parse-v2", {
       data: { filePath: "user-test123/long.pdf" },
@@ -116,15 +103,10 @@ test.describe("PDF Parse V2 API Routes", () => {
 });
 
 test.describe("PDF Parse V2 - Password Protection (API)", () => {
-  test("should return 401 for encrypted PDF without password", async ({
-    request,
-  }) => {
+  test("should return 401 for encrypted PDF without password", async ({ request }) => {
     // Note: Requires encrypted PDF fixture (generated via scripts/generate-encrypted-pdf.ts)
     // For now, this test will be skipped if no encrypted fixture exists
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     const response = await request.post("/api/parse-v2", {
       data: { filePath: "user-test123/encrypted.pdf" },
@@ -135,13 +117,8 @@ test.describe("PDF Parse V2 - Password Protection (API)", () => {
     expect(body.code).toBe("PASSWORD_REQUIRED");
   });
 
-  test("should return 401 for encrypted PDF with invalid password", async ({
-    request,
-  }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+  test("should return 401 for encrypted PDF with invalid password", async ({ request }) => {
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     const response = await request.post("/api/parse-v2", {
       data: {
@@ -155,13 +132,8 @@ test.describe("PDF Parse V2 - Password Protection (API)", () => {
     expect(body.code).toBe("PASSWORD_INVALID");
   });
 
-  test("should return 200 for encrypted PDF with correct password", async ({
-    request,
-  }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+  test("should return 200 for encrypted PDF with correct password", async ({ request }) => {
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     const response = await request.post("/api/parse-v2", {
       data: {
@@ -186,13 +158,8 @@ test.describe("PDF Password Dialog UX", () => {
     await page.waitForLoadState("networkidle");
   });
 
-  test("should show password dialog when uploading encrypted PDF", async ({
-    page,
-  }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+  test("should show password dialog when uploading encrypted PDF", async ({ page }) => {
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     // Find file upload input
     const fileInput = page.locator('input[type="file"]');
@@ -217,10 +184,7 @@ test.describe("PDF Password Dialog UX", () => {
   });
 
   test("should show error for invalid password", async ({ page }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     // Upload encrypted PDF
     const fileInput = page.locator('input[type="file"]');
@@ -248,13 +212,8 @@ test.describe("PDF Password Dialog UX", () => {
     await expect(passwordDialog).toBeVisible();
   });
 
-  test("should successfully upload encrypted PDF with correct password", async ({
-    page,
-  }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+  test("should successfully upload encrypted PDF with correct password", async ({ page }) => {
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     // Upload encrypted PDF
     const fileInput = page.locator('input[type="file"]');
@@ -282,10 +241,7 @@ test.describe("PDF Password Dialog UX", () => {
   });
 
   test("should allow canceling password dialog", async ({ page }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     // Upload encrypted PDF
     const fileInput = page.locator('input[type="file"]');
@@ -296,7 +252,7 @@ test.describe("PDF Password Dialog UX", () => {
     await expect(passwordDialog).toBeVisible({ timeout: 10000 });
 
     // Click cancel button
-    const cancelButton = passwordDialog.locator('button', {
+    const cancelButton = passwordDialog.locator("button", {
       hasText: "Cancel",
     });
     await cancelButton.click();
@@ -311,10 +267,7 @@ test.describe("PDF Password Dialog UX", () => {
 
 test.describe("PDF Parse V2 - Telemetry Verification", () => {
   test("should log telemetry for successful parse", async ({ request }) => {
-    test.skip(
-      !process.env.DEV_USE_FIXTURE_STORAGE,
-      "Fixture storage not enabled"
-    );
+    test.skip(!process.env.DEV_USE_FIXTURE_STORAGE, "Fixture storage not enabled");
 
     // This test verifies that telemetry is logged (visual check in dev logs)
     // Actual log verification would require log aggregation setup
@@ -334,13 +287,8 @@ test.describe("PDF Parse V2 - Telemetry Verification", () => {
     // 3. Test helper to verify log presence
   });
 
-  test("should log telemetry for password-required error", async ({
-    request,
-  }) => {
-    test.skip(
-      !process.env.HAS_ENCRYPTED_FIXTURE,
-      "Encrypted PDF fixture not available"
-    );
+  test("should log telemetry for password-required error", async ({ request }) => {
+    test.skip(!process.env.HAS_ENCRYPTED_FIXTURE, "Encrypted PDF fixture not available");
 
     const response = await request.post("/api/parse-v2", {
       data: { filePath: "user-test123/encrypted.pdf" },

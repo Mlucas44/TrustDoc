@@ -16,6 +16,8 @@ export const ContractTypeEnum = z.enum([
   "NDA", // Non-Disclosure Agreement / Confidentiality
   "DEVIS", // Quote / Estimate
   "PARTENARIAT", // Partnership / Collaboration Agreement
+  "FORM_CERFA", // Administrative Form / Cerfa
+  "TABULAR_COMMERCIAL", // Commercial Table / Pricing Sheet
   "AUTRE", // Other / Unknown
 ]);
 
@@ -74,6 +76,16 @@ export const CONTRACT_TYPE_ALIASES: Record<ContractType, string[]> = {
     "memorandum of understanding",
     "mou",
   ],
+  FORM_CERFA: [
+    "cerfa",
+    "formulaire administratif",
+    "formulaire",
+    "administrative form",
+    "form",
+    "declaration",
+    "demande",
+  ],
+  TABULAR_COMMERCIAL: ["devis", "quotation", "pricing", "tarif", "price list", "catalogue"],
   AUTRE: ["other", "unknown", "autre", "miscellaneous"],
 };
 

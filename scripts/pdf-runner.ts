@@ -75,9 +75,7 @@ function printResult(result: Awaited<ReturnType<typeof extractTextWithPdfJs>>) {
   console.log(`\n🔹 Memory Stats:`);
   console.log(`   Input Size:      ${formatBytes(result.stats.memory.inputBufferBytes)}`);
   console.log(`   Extracted Text:  ${formatBytes(result.stats.memory.extractedTextBytes)}`);
-  console.log(
-    `   Estimated Peak:  ${formatBytes(result.stats.memory.estimatedPeakBytes)}`
-  );
+  console.log(`   Estimated Peak:  ${formatBytes(result.stats.memory.estimatedPeakBytes)}`);
 
   // Text preview
   console.log(`\n🔹 Text Preview (first 200 chars):`);

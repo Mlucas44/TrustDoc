@@ -23,7 +23,6 @@ import {
   PdfFileTooLargeError,
   PdfTooManyPagesError,
   PdfTextEmptyError,
-  type PdfExtractionError,
 } from "@/src/pdf/extract/errors";
 
 /**

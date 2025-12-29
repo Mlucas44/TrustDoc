@@ -7,13 +7,18 @@
 
 import "server-only";
 
-import type { DetectionResult } from "@/src/schemas/detect";
-
 import { type Trace } from "@/src/lib/timing";
 import { extractTextWithPdfJs } from "@/src/pdf/extract/pdfjs";
 import { detectContractType } from "@/src/services/detect/contract-type";
 import { downloadFile } from "@/src/services/storage";
+import {
+  analyzeLayoutFromBuffer,
+  computeCerfaLikelihood,
+  type LayoutInfo,
+} from "@/src/services/text/layout-pass";
 import { normalizeContractText } from "@/src/services/text/normalize";
+
+import type { DetectionResult } from "@/src/schemas/detect";
 
 /**
  * Prepared text payload (ready for LLM)
@@ -60,6 +65,10 @@ export interface PreparedTextPayload {
    * Contract type detection result
    */
   contractType?: DetectionResult;
+  /**
+   * Layout analysis result (optional, for form detection)
+   */
+  layoutInfo?: LayoutInfo;
 }
 
 /**
@@ -101,14 +110,29 @@ export async function prepareTextFromStorage(
   const pdfBuffer = await downloadFile(filePath);
   endDownload?.();
 
-  // 2. Parse PDF with pdfjs (errors are thrown directly)
+  // 2. Layout pass BEFORE text extraction (for form detection)
+  let layoutInfo: LayoutInfo | undefined;
+  if (detectType) {
+    const endLayout = trace?.start("layout_pass");
+    try {
+      layoutInfo = await analyzeLayoutFromBuffer(pdfBuffer);
+      endLayout?.();
+    } catch (error) {
+      endLayout?.();
+      console.error("[prepareTextFromStorage] Layout analysis failed:", error);
+      // Don't fail the whole pipeline if layout analysis fails
+      layoutInfo = undefined;
+    }
+  }
+
+  // 3. Parse PDF with pdfjs (errors are thrown directly)
   const endParse = trace?.start("parse_pdf", { filePath });
   const pdfData = await extractTextWithPdfJs(pdfBuffer, {
     pageTimeoutMs: Math.min(timeoutMs / 10, 3000), // Per-page timeout (max 3s)
   });
   endParse?.();
 
-  // 3. Normalize text
+  // 4. Normalize text
   const endNormalize = trace?.start("normalize");
   const normalizeResult = normalizeContractText({
     textRaw: pdfData.textRaw,
@@ -117,12 +141,36 @@ export async function prepareTextFromStorage(
   });
   endNormalize?.();
 
-  // 3. Detect contract type (optional, can be disabled for performance)
+  // 5. Detect contract type (optional, can be disabled for performance)
   let contractTypeResult: DetectionResult | undefined;
   if (detectType) {
     const endDetect = trace?.start("detect_type");
     try {
-      contractTypeResult = await detectContractType(normalizeResult.textClean);
+      // Check if layout analysis suggests a Cerfa form
+      let forcedType: "FORM_CERFA" | undefined;
+      if (layoutInfo) {
+        const cerfaScore = computeCerfaLikelihood(layoutInfo);
+        // Lowered threshold to 0.44 to catch borderline cases (cerfa.pdf at 0.450)
+        if (cerfaScore >= 0.44) {
+          console.info(
+            `[prepareTextFromStorage] Layout analysis suggests FORM_CERFA (score: ${cerfaScore.toFixed(2)})`
+          );
+          forcedType = "FORM_CERFA";
+        }
+      }
+
+      // If layout forced FORM_CERFA, use that
+      if (forcedType === "FORM_CERFA") {
+        contractTypeResult = {
+          type: "FORM_CERFA",
+          confidence: 0.85, // High confidence from layout analysis
+          source: "heuristic",
+          evidence: ["Layout analysis detected form structure with labels and fields"],
+        };
+      } else {
+        // Otherwise, run normal detection
+        contractTypeResult = await detectContractType(normalizeResult.textClean);
+      }
       endDetect?.();
     } catch (error) {
       endDetect?.();
@@ -132,7 +180,7 @@ export async function prepareTextFromStorage(
     }
   }
 
-  // 4. Combine into final payload
+  // 6. Combine into final payload
   return {
     textClean: normalizeResult.textClean,
     textTokensApprox: normalizeResult.textTokensApprox,
@@ -140,6 +188,7 @@ export async function prepareTextFromStorage(
     meta: pdfData.meta,
     sections: normalizeResult.sections,
     contractType: contractTypeResult,
+    layoutInfo,
   };
 }
 
